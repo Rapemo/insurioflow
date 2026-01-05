@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { DataTable } from '@/components/ui/data-table';
 import { StatusBadge, getStatusType } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { mockQuotes, formatCurrency, formatDate } from '@/data/mockData';
 import { Quote } from '@/types/insurance';
 import { Plus, Search, Filter, Download, FileText, Eye, Copy } from 'lucide-react';
@@ -15,6 +16,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { quoteService } from '@/services/quoteService';
+import { useToast } from '@/hooks/use-toast';
 
 const statusLabels: Record<string, string> = {
   draft: 'Draft',
@@ -37,8 +47,8 @@ const columns = [
     header: 'Company',
     render: (quote: Quote) => (
       <div>
-        <p className="font-medium text-foreground">{quote.companyName}</p>
-        <p className="text-xs text-muted-foreground">{quote.employeesCount} employees</p>
+        <p className="font-medium text-foreground">{quote.company_name || 'N/A'}</p>
+        <p className="text-xs text-muted-foreground">{quote.employees_count} employees</p>
       </div>
     ),
   },
@@ -76,7 +86,7 @@ const columns = [
     key: 'validUntil',
     header: 'Valid Until',
     render: (quote: Quote) => (
-      <span className="text-muted-foreground">{formatDate(quote.validUntil)}</span>
+      <span className="text-muted-foreground">{formatDate(quote.valid_until)}</span>
     ),
   },
   {
@@ -84,10 +94,18 @@ const columns = [
     header: '',
     render: (quote: Quote) => (
       <div className="flex items-center gap-1">
-        <Button variant="ghost" size="sm">
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={() => handleViewQuote(quote.id)}
+        >
           <Eye className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="sm">
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={() => handleCopyQuote(quote.id)}
+        >
           <Copy className="h-4 w-4" />
         </Button>
       </div>
@@ -98,16 +116,111 @@ const columns = [
 const Quotations = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [isViewQuoteOpen, setIsViewQuoteOpen] = useState(false);
+  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
-  const filteredQuotes = mockQuotes.filter((quote) => {
+  useEffect(() => {
+    fetchQuotes();
+  }, []);
+
+  const fetchQuotes = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await quoteService.getQuotes();
+      
+      if (error) {
+        setError(error.message);
+        toast({
+          title: "Error",
+          description: "Failed to fetch quotes",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (data) {
+        setQuotes(data);
+      }
+    } catch (err) {
+      setError('Failed to load quotes');
+      toast({
+        title: "Error",
+        description: "Failed to load quotes",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredQuotes = quotes.filter((quote) => {
     const matchesSearch = 
-      quote.companyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (quote.company_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       quote.id.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || quote.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
   const totalPremium = filteredQuotes.reduce((sum, quote) => sum + quote.premium, 0);
+
+  const handleViewQuote = async (quoteId: string) => {
+    try {
+      const { data, error } = await quoteService.getQuoteById(quoteId);
+      
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to fetch quote details",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (data) {
+        setSelectedQuote(data);
+        setIsViewQuoteOpen(true);
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch quote details",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleCopyQuote = async (quoteId: string) => {
+    try {
+      const { data, error } = await quoteService.copyQuote(quoteId);
+      
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to copy quote",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (data) {
+        setQuotes([data, ...quotes]);
+        toast({
+          title: "Success",
+          description: `Quote copied successfully. New quote ID: ${data.quote_number}`
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to copy quote",
+        variant: "destructive"
+      });
+    }
+  };
 
   return (
     <AppLayout title="Quotations" subtitle="Create and manage insurance quotes">
@@ -120,7 +233,7 @@ const Quotations = () => {
                 <FileText className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{mockQuotes.length}</p>
+                <p className="text-2xl font-bold text-foreground">{quotes.length}</p>
                 <p className="text-sm text-muted-foreground">Total Quotes</p>
               </div>
             </div>
@@ -132,7 +245,7 @@ const Quotations = () => {
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">
-                  {mockQuotes.filter((q) => q.status === 'approved').length}
+                  {quotes.filter((q) => q.status === 'approved').length}
                 </p>
                 <p className="text-sm text-muted-foreground">Approved</p>
               </div>
@@ -145,7 +258,7 @@ const Quotations = () => {
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">
-                  {mockQuotes.filter((q) => q.status === 'pending').length}
+                  {quotes.filter((q) => q.status === 'pending').length}
                 </p>
                 <p className="text-sm text-muted-foreground">Pending</p>
               </div>
@@ -213,8 +326,85 @@ const Quotations = () => {
 
         {/* Summary Footer */}
         <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <p>Showing {filteredQuotes.length} of {mockQuotes.length} quotes</p>
+          <p>Showing {filteredQuotes.length} of {quotes.length} quotes</p>
         </div>
+
+        {/* View Quote Dialog */}
+        <Dialog open={isViewQuoteOpen} onOpenChange={setIsViewQuoteOpen}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Quote Details</DialogTitle>
+              <DialogDescription>
+                View quote information and manage actions
+              </DialogDescription>
+            </DialogHeader>
+            {selectedQuote && (
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Quote Number</Label>
+                    <p className="font-mono text-sm">{selectedQuote.quote_number}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+                    <StatusBadge status={getStatusType(selectedQuote.status)} label={statusLabels[selectedQuote.status]} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Company</Label>
+                    <p className="font-medium">{selectedQuote.company_name || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Provider</Label>
+                    <p className="font-medium">{selectedQuote.provider}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Product Type</Label>
+                    <p className="font-medium">{selectedQuote.product_type}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Employees Covered</Label>
+                    <p className="font-medium">{selectedQuote.employees_count}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Premium</Label>
+                    <p className="font-semibold text-lg">{formatCurrency(selectedQuote.premium)}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Valid Until</Label>
+                    <p className="font-medium">{formatDate(selectedQuote.valid_until)}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Created Date</Label>
+                    <p className="font-medium">{formatDate(selectedQuote.created_date)}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Last Updated</Label>
+                    <p className="font-medium">{formatDate(selectedQuote.updated_date)}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsViewQuoteOpen(false)}>
+                Close
+              </Button>
+              {selectedQuote && (
+                <Button onClick={() => handleCopyQuote(selectedQuote.id)}>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy Quote
+                </Button>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );

@@ -4,17 +4,26 @@ import { DataTable } from '@/components/ui/data-table';
 import { StatusBadge, getStatusType } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import { mockEmployees, mockCompanies, formatCurrency, formatDate } from '@/data/mockData';
 import { Employee } from '@/types/insurance';
-import { Search, Filter, Download, RefreshCw, Users, Upload } from 'lucide-react';
+import { Search, Filter, Download, RefreshCw, Users, Upload, Plus } from 'lucide-react';
 import {
-  Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
 
 const columns = [
   {
@@ -95,8 +104,24 @@ const Employees = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [companyFilter, setCompanyFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [isAddEmployeeOpen, setIsAddEmployeeOpen] = useState(false);
+  const [employees, setEmployees] = useState<Employee[]>(mockEmployees);
+  const { toast } = useToast();
+  
+  const [newEmployee, setNewEmployee] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    companyId: '',
+    department: '',
+    jobTitle: '',
+    salary: 0,
+    dependents: 0,
+    hireDate: '',
+    status: 'active' as const
+  });
 
-  const filteredEmployees = mockEmployees.filter((employee) => {
+  const filteredEmployees = employees.filter((employee) => {
     const matchesSearch =
       `${employee.firstName} ${employee.lastName}`
         .toLowerCase()
@@ -107,6 +132,42 @@ const Employees = () => {
     const matchesStatus = statusFilter === 'all' || employee.status === statusFilter;
     return matchesSearch && matchesCompany && matchesStatus;
   });
+
+  const handleAddEmployee = () => {
+    if (!newEmployee.firstName.trim() || !newEmployee.lastName.trim() || !newEmployee.email.trim()) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const employee: Employee = {
+      id: `EMP-${Date.now()}`,
+      ...newEmployee,
+      hireDate: newEmployee.hireDate || new Date().toISOString().split('T')[0]
+    };
+
+    setEmployees([employee, ...employees]);
+    setNewEmployee({
+      firstName: '',
+      lastName: '',
+      email: '',
+      companyId: '',
+      department: '',
+      jobTitle: '',
+      salary: 0,
+      dependents: 0,
+      hireDate: '',
+      status: 'active'
+    });
+    setIsAddEmployeeOpen(false);
+    toast({
+      title: "Success",
+      description: "Employee added successfully"
+    });
+  };
 
   return (
     <AppLayout title="Employees" subtitle="View and manage employee census data">
@@ -119,7 +180,7 @@ const Employees = () => {
                 <Users className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{mockEmployees.length}</p>
+                <p className="text-2xl font-bold text-foreground">{employees.length}</p>
                 <p className="text-sm text-muted-foreground">Total Employees</p>
               </div>
             </div>
@@ -131,7 +192,7 @@ const Employees = () => {
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">
-                  {mockEmployees.filter((e) => e.status === 'active').length}
+                  {employees.filter((e) => e.status === 'active').length}
                 </p>
                 <p className="text-sm text-muted-foreground">Active</p>
               </div>
@@ -141,7 +202,7 @@ const Employees = () => {
             <div>
               <p className="text-2xl font-bold text-foreground">
                 {formatCurrency(
-                  mockEmployees.reduce((sum, e) => sum + e.salary, 0) / mockEmployees.length
+                  employees.reduce((sum, e) => sum + e.salary, 0) / employees.length
                 )}
               </p>
               <p className="text-sm text-muted-foreground">Avg Salary</p>
@@ -150,7 +211,7 @@ const Employees = () => {
           <div className="stat-card">
             <div>
               <p className="text-2xl font-bold text-foreground">
-                {mockEmployees.reduce((sum, e) => sum + e.dependents, 0)}
+                {employees.reduce((sum, e) => sum + e.dependents, 0)}
               </p>
               <p className="text-sm text-muted-foreground">Total Dependents</p>
             </div>
@@ -210,6 +271,10 @@ const Employees = () => {
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
+            <Button size="sm" onClick={() => setIsAddEmployeeOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Employee
+            </Button>
           </div>
         </div>
 
@@ -224,9 +289,133 @@ const Employees = () => {
 
         {/* Summary Footer */}
         <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <p>Showing {filteredEmployees.length} of {mockEmployees.length} employees</p>
+          <p>Showing {filteredEmployees.length} of {employees.length} employees</p>
           <p>Last synced: 2 hours ago</p>
         </div>
+
+        {/* Add Employee Dialog */}
+        <Dialog open={isAddEmployeeOpen} onOpenChange={setIsAddEmployeeOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Add New Employee</DialogTitle>
+              <DialogDescription>
+                Add a new employee to the system
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input
+                    id="firstName"
+                    value={newEmployee.firstName}
+                    onChange={(e) => setNewEmployee({...newEmployee, firstName: e.target.value})}
+                    placeholder="Enter first name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    value={newEmployee.lastName}
+                    onChange={(e) => setNewEmployee({...newEmployee, lastName: e.target.value})}
+                    placeholder="Enter last name"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={newEmployee.email}
+                  onChange={(e) => setNewEmployee({...newEmployee, email: e.target.value})}
+                  placeholder="Enter email address"
+                />
+              </div>
+              <div>
+                <Label htmlFor="company">Company</Label>
+                <Select
+                  value={newEmployee.companyId}
+                  onValueChange={(value) => setNewEmployee({...newEmployee, companyId: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select company" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {mockCompanies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="department">Department</Label>
+                  <Input
+                    id="department"
+                    value={newEmployee.department}
+                    onChange={(e) => setNewEmployee({...newEmployee, department: e.target.value})}
+                    placeholder="Enter department"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="jobTitle">Job Title</Label>
+                  <Input
+                    id="jobTitle"
+                    value={newEmployee.jobTitle}
+                    onChange={(e) => setNewEmployee({...newEmployee, jobTitle: e.target.value})}
+                    placeholder="Enter job title"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="salary">Salary</Label>
+                  <Input
+                    id="salary"
+                    type="number"
+                    value={newEmployee.salary}
+                    onChange={(e) => setNewEmployee({...newEmployee, salary: parseFloat(e.target.value) || 0})}
+                    placeholder="Enter salary"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="dependents">Dependents</Label>
+                  <Input
+                    id="dependents"
+                    type="number"
+                    value={newEmployee.dependents}
+                    onChange={(e) => setNewEmployee({...newEmployee, dependents: parseInt(e.target.value) || 0})}
+                    placeholder="Number of dependents"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="hireDate">Hire Date</Label>
+                <Input
+                  id="hireDate"
+                  type="date"
+                  value={newEmployee.hireDate}
+                  onChange={(e) => setNewEmployee({...newEmployee, hireDate: e.target.value})}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsAddEmployeeOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddEmployee}
+                disabled={!newEmployee.firstName.trim() || !newEmployee.lastName.trim() || !newEmployee.email.trim()}
+              >
+                Add Employee
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );

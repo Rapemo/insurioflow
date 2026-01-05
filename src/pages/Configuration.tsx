@@ -3,6 +3,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
 
 import { getBenefits, addBenefit, updateBenefit, deleteBenefit } from '@/services/benefitService';
 
@@ -55,12 +57,32 @@ const automationRules = [
 const Configuration = () => {
   const [activeTab, setActiveTab] = useState('benefits');
   const [isAddBenefitOpen, setIsAddBenefitOpen] = useState(false);
+  const [isAddCountryOpen, setIsAddCountryOpen] = useState(false);
+  const [isAddRuleOpen, setIsAddRuleOpen] = useState(false);
+  const [isAddTemplateOpen, setIsAddTemplateOpen] = useState(false);
   const [newBenefit, setNewBenefit] = useState({
     name: '',
     type: 'medical',
     status: 'active'
   });
-    const [benefits, setBenefits] = useState<Array<{
+  const [newCountry, setNewCountry] = useState({
+    name: '',
+    code: '',
+    currency: '',
+    status: 'active'
+  });
+  const [newRule, setNewRule] = useState({
+    name: '',
+    trigger: '',
+    action: '',
+    status: 'active'
+  });
+  const [newTemplate, setNewTemplate] = useState({
+    name: '',
+    type: 'PDF',
+    category: ''
+  });
+  const [benefits, setBenefits] = useState<Array<{
     id: string;
     name: string;
     type: string;
@@ -68,6 +90,7 @@ const Configuration = () => {
   }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchBenefits = async () => {
@@ -188,7 +211,7 @@ const Configuration = () => {
                   Configure supported countries and regional settings
                 </p>
               </div>
-              <Button size="sm">
+              <Button size="sm" onClick={() => setIsAddCountryOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Country
               </Button>
@@ -231,7 +254,7 @@ const Configuration = () => {
                   Configure automated workflows and notifications
                 </p>
               </div>
-              <Button size="sm">
+              <Button size="sm" onClick={() => setIsAddRuleOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Rule
               </Button>
@@ -343,7 +366,7 @@ const Configuration = () => {
                   Manage templates for quotes, policies, and communications
                 </p>
               </div>
-              <Button size="sm">
+              <Button size="sm" onClick={() => setIsAddTemplateOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Template
               </Button>
@@ -500,6 +523,263 @@ const Configuration = () => {
                 disabled={!newBenefit.name.trim()}
               >
                 Add Benefit
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Country Dialog */}
+        <Dialog open={isAddCountryOpen} onOpenChange={setIsAddCountryOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Add New Country</DialogTitle>
+              <DialogDescription>
+                Configure a new supported country
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="country_name" className="text-right">
+                  Name
+                </Label>
+                <Input
+                  id="country_name"
+                  value={newCountry.name}
+                  onChange={(e) => setNewCountry({...newCountry, name: e.target.value})}
+                  className="col-span-3"
+                  placeholder="Enter country name"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="country_code" className="text-right">
+                  Code
+                </Label>
+                <Input
+                  id="country_code"
+                  value={newCountry.code}
+                  onChange={(e) => setNewCountry({...newCountry, code: e.target.value.toUpperCase()})}
+                  className="col-span-3"
+                  placeholder="Enter country code (e.g., KE)"
+                  maxLength={2}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="currency" className="text-right">
+                  Currency
+                </Label>
+                <Input
+                  id="currency"
+                  value={newCountry.currency}
+                  onChange={(e) => setNewCountry({...newCountry, currency: e.target.value.toUpperCase()})}
+                  className="col-span-3"
+                  placeholder="Enter currency code (e.g., KES)"
+                  maxLength={3}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right">
+                  Status
+                </Label>
+                <div className="flex items-center space-x-2 col-span-3">
+                  <Switch
+                    id="country_status"
+                    checked={newCountry.status === 'active'}
+                    onCheckedChange={(checked) =>
+                      setNewCountry({...newCountry, status: checked ? 'active' : 'inactive'})
+                    }
+                  />
+                  <Label htmlFor="country_status">
+                    {newCountry.status === 'active' ? 'Active' : 'Inactive'}
+                  </Label>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsAddCountryOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  toast({
+                    title: "Success",
+                    description: "Country added successfully"
+                  });
+                  setNewCountry({ name: '', code: '', currency: '', status: 'active' });
+                  setIsAddCountryOpen(false);
+                }}
+                disabled={!newCountry.name.trim() || !newCountry.code.trim() || !newCountry.currency.trim()}
+              >
+                Add Country
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Rule Dialog */}
+        <Dialog open={isAddRuleOpen} onOpenChange={setIsAddRuleOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Add Automation Rule</DialogTitle>
+              <DialogDescription>
+                Create a new automation rule
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="rule_name" className="text-right">
+                  Name
+                </Label>
+                <Input
+                  id="rule_name"
+                  value={newRule.name}
+                  onChange={(e) => setNewRule({...newRule, name: e.target.value})}
+                  className="col-span-3"
+                  placeholder="Enter rule name"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="trigger" className="text-right">
+                  Trigger
+                </Label>
+                <Textarea
+                  id="trigger"
+                  value={newRule.trigger}
+                  onChange={(e) => setNewRule({...newRule, trigger: e.target.value})}
+                  className="col-span-3"
+                  placeholder="Describe the trigger condition"
+                  rows={2}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="action" className="text-right">
+                  Action
+                </Label>
+                <Textarea
+                  id="action"
+                  value={newRule.action}
+                  onChange={(e) => setNewRule({...newRule, action: e.target.value})}
+                  className="col-span-3"
+                  placeholder="Describe the action to perform"
+                  rows={2}
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right">
+                  Status
+                </Label>
+                <div className="flex items-center space-x-2 col-span-3">
+                  <Switch
+                    id="rule_status"
+                    checked={newRule.status === 'active'}
+                    onCheckedChange={(checked) =>
+                      setNewRule({...newRule, status: checked ? 'active' : 'inactive'})
+                    }
+                  />
+                  <Label htmlFor="rule_status">
+                    {newRule.status === 'active' ? 'Active' : 'Inactive'}
+                  </Label>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsAddRuleOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  toast({
+                    title: "Success",
+                    description: "Automation rule added successfully"
+                  });
+                  setNewRule({ name: '', trigger: '', action: '', status: 'active' });
+                  setIsAddRuleOpen(false);
+                }}
+                disabled={!newRule.name.trim() || !newRule.trigger.trim() || !newRule.action.trim()}
+              >
+                Add Rule
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Template Dialog */}
+        <Dialog open={isAddTemplateOpen} onOpenChange={setIsAddTemplateOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Add Document Template</DialogTitle>
+              <DialogDescription>
+                Create a new document template
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="template_name" className="text-right">
+                  Name
+                </Label>
+                <Input
+                  id="template_name"
+                  value={newTemplate.name}
+                  onChange={(e) => setNewTemplate({...newTemplate, name: e.target.value})}
+                  className="col-span-3"
+                  placeholder="Enter template name"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="template_type" className="text-right">
+                  Type
+                </Label>
+                <Select
+                  value={newTemplate.type}
+                  onValueChange={(value) => setNewTemplate({...newTemplate, type: value})}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select template type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PDF">PDF</SelectItem>
+                    <SelectItem value="Email">Email</SelectItem>
+                    <SelectItem value="Word">Word</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="category" className="text-right">
+                  Category
+                </Label>
+                <Select
+                  value={newTemplate.category}
+                  onValueChange={(value) => setNewTemplate({...newTemplate, category: value})}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Quotation">Quotation</SelectItem>
+                    <SelectItem value="Policy">Policy</SelectItem>
+                    <SelectItem value="Renewal">Renewal</SelectItem>
+                    <SelectItem value="Onboarding">Onboarding</SelectItem>
+                    <SelectItem value="Claims">Claims</SelectItem>
+                    <SelectItem value="Finance">Finance</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsAddTemplateOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  toast({
+                    title: "Success",
+                    description: "Template added successfully"
+                  });
+                  setNewTemplate({ name: '', type: 'PDF', category: '' });
+                  setIsAddTemplateOpen(false);
+                }}
+                disabled={!newTemplate.name.trim() || !newTemplate.category.trim()}
+              >
+                Add Template
               </Button>
             </div>
           </DialogContent>
