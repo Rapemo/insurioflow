@@ -1,30 +1,32 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getFriendlyErrorMessage } from '@/utils/errorHandler';
 
 export interface Policy {
   id: string;
   company_id: string;
   policy_number: string;
   product_type: string;
-  provider: string;
-  total_premium: number;
-  status: 'pending_approval' | 'active' | 'expired' | 'cancelled';
+  provider_id: string;
+  premium: number;
+  status: string;
   start_date: string;
   end_date: string;
-  employees_count: number;
-  created_date: string;
-  updated_date: string;
+  covered_employees: number;
+  created_at: string;
+  updated_at: string;
   // Joined fields
   company_name?: string;
+  provider_name?: string;
 }
 
 export interface CreatePolicyData {
   company_id: string;
   product_type: string;
-  provider: string;
-  total_premium: number;
+  provider_id: string;
+  premium: number;
   start_date: string;
   end_date: string;
-  employees_count: number;
+  covered_employees: number;
 }
 
 export const policyService = {
@@ -36,29 +38,33 @@ export const policyService = {
           *,
           companies(name)
         `)
-        .order('created_date', { ascending: false });
+        .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching policies:', error);
+        return { data: null, error: getFriendlyErrorMessage(error) };
+      }
 
       const transformedData: Policy[] = (data || []).map((item: any) => ({
         id: item.id,
         company_id: item.company_id,
         policy_number: item.policy_number,
         product_type: item.product_type,
-        provider: item.provider,
-        total_premium: item.total_premium,
+        provider_id: item.provider_id,
+        premium: item.premium,
         status: item.status,
         start_date: item.start_date,
         end_date: item.end_date,
-        employees_count: item.employees_count,
-        created_date: item.created_date,
-        updated_date: item.updated_date,
+        covered_employees: item.covered_employees,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
         company_name: item.companies?.name
       }));
 
       return { data: transformedData, error: null };
     } catch (error) {
-      return { data: null, error };
+      console.error('Unexpected error fetching policies:', error);
+      return { data: null, error: getFriendlyErrorMessage(error) };
     }
   },
 
@@ -73,21 +79,24 @@ export const policyService = {
         .eq('id', id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching policy:', error);
+        return { data: null, error: getFriendlyErrorMessage(error) };
+      }
 
       const transformedData: Policy = {
         id: data.id,
         company_id: data.company_id,
         policy_number: data.policy_number,
         product_type: data.product_type,
-        provider: data.provider,
-        total_premium: data.total_premium,
+        provider_id: data.provider_id,
+        premium: data.premium,
         status: data.status,
         start_date: data.start_date,
         end_date: data.end_date,
-        employees_count: data.employees_count,
-        created_date: data.created_date,
-        updated_date: data.updated_date,
+        covered_employees: data.covered_employees,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
         company_name: data.companies?.name
       };
 
@@ -106,10 +115,10 @@ export const policyService = {
         .from('policies')
         .insert({
           ...policyData,
-          policy_number: policyNumber,
+          policy_number: `POL-${Date.now()}`,
           status: 'pending_approval',
-          created_date: now,
-          updated_date: now
+          created_at: now,
+          updated_at: now
         })
         .select()
         .single();
@@ -128,7 +137,7 @@ export const policyService = {
         .from('policies')
         .update({
           status,
-          updated_date: new Date().toISOString()
+          updated_at: new Date().toISOString()
         })
         .eq('id', id)
         .select()
@@ -149,7 +158,7 @@ export const policyService = {
         .update({
           end_date: newEndDate,
           status: 'active',
-          updated_date: new Date().toISOString()
+          updated_at: new Date().toISOString()
         })
         .eq('id', id)
         .select()

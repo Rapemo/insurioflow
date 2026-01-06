@@ -1,25 +1,27 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getFriendlyErrorMessage } from '@/utils/errorHandler';
 
 export interface Claim {
   id: string;
-  company_id: string;
+  policy_id: string;
   employee_id: string;
-  policy_number: string;
+  claim_number: string;
   claim_type: string;
   amount: number;
   description: string;
-  status: 'submitted' | 'under_review' | 'approved' | 'rejected' | 'paid';
+  status: string;
   submitted_date: string;
-  updated_date: string;
+  created_at: string;
+  updated_at: string;
+  resolved_date?: string;
   // Joined fields
   company_name?: string;
   employee_name?: string;
 }
 
 export interface CreateClaimData {
-  company_id: string;
+  policy_id: string;
   employee_id: string;
-  policy_number: string;
   claim_type: string;
   amount: number;
   description: string;
@@ -32,31 +34,36 @@ export const claimService = {
         .from('claims')
         .select(`
           *,
-          companies(name),
-          employees(first_name, last_name)
+          policies!inner(companies(name))
         `)
         .order('submitted_date', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching claims:', error);
+        return { data: null, error: getFriendlyErrorMessage(error) };
+      }
 
       const transformedData: Claim[] = (data || []).map((item: any) => ({
         id: item.id,
-        company_id: item.company_id,
+        policy_id: item.policy_id,
         employee_id: item.employee_id,
-        policy_number: item.policy_number,
+        claim_number: item.claim_number,
         claim_type: item.claim_type,
         amount: item.amount,
         description: item.description,
         status: item.status,
         submitted_date: item.submitted_date,
-        updated_date: item.updated_date,
-        company_name: item.companies?.name,
-        employee_name: item.employees ? `${item.employees.first_name} ${item.employees.last_name}` : undefined
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        resolved_date: item.resolved_date,
+        company_name: item.policies?.companies?.name,
+        employee_name: undefined
       }));
 
       return { data: transformedData, error: null };
     } catch (error) {
-      return { data: null, error };
+      console.error('Unexpected error fetching claims:', error);
+      return { data: null, error: getFriendlyErrorMessage(error) };
     }
   },
 
@@ -66,32 +73,37 @@ export const claimService = {
         .from('claims')
         .select(`
           *,
-          companies(name),
-          employees(first_name, last_name, email)
+          policies!inner(companies(name))
         `)
         .eq('id', id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching claim:', error);
+        return { data: null, error: getFriendlyErrorMessage(error) };
+      }
 
       const transformedData: Claim = {
         id: data.id,
-        company_id: data.company_id,
+        policy_id: data.policy_id,
         employee_id: data.employee_id,
-        policy_number: data.policy_number,
+        claim_number: data.claim_number,
         claim_type: data.claim_type,
         amount: data.amount,
         description: data.description,
         status: data.status,
         submitted_date: data.submitted_date,
-        updated_date: data.updated_date,
-        company_name: data.companies?.name,
-        employee_name: data.employees ? `${data.employees.first_name} ${data.employees.last_name}` : undefined
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        resolved_date: data.resolved_date,
+        company_name: data.policies?.companies?.name,
+        employee_name: undefined
       };
 
       return { data: transformedData, error: null };
     } catch (error) {
-      return { data: null, error };
+      console.error('Unexpected error fetching claim:', error);
+      return { data: null, error: getFriendlyErrorMessage(error) };
     }
   },
 
@@ -103,18 +115,24 @@ export const claimService = {
         .from('claims')
         .insert({
           ...claimData,
+          claim_number: `CLM-${Date.now()}`,
           status: 'submitted',
           submitted_date: now,
-          updated_date: now
+          created_at: now,
+          updated_at: now
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating claim:', error);
+        return { data: null, error: getFriendlyErrorMessage(error) };
+      }
 
       return { data, error: null };
     } catch (error) {
-      return { data: null, error };
+      console.error('Unexpected error creating claim:', error);
+      return { data: null, error: getFriendlyErrorMessage(error) };
     }
   },
 
@@ -124,17 +142,21 @@ export const claimService = {
         .from('claims')
         .update({
           status,
-          updated_date: new Date().toISOString()
+          updated_at: new Date().toISOString()
         })
         .eq('id', id)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating claim status:', error);
+        return { data: null, error: getFriendlyErrorMessage(error) };
+      }
 
       return { data, error: null };
     } catch (error) {
-      return { data: null, error };
+      console.error('Unexpected error updating claim status:', error);
+      return { data: null, error: getFriendlyErrorMessage(error) };
     }
   },
 
@@ -145,11 +167,15 @@ export const claimService = {
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error deleting claim:', error);
+        return { error: getFriendlyErrorMessage(error) };
+      }
 
       return { error: null };
     } catch (error) {
-      return { error };
+      console.error('Unexpected error deleting claim:', error);
+      return { error: getFriendlyErrorMessage(error) };
     }
   }
 };

@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Company } from '@/types/insurance';
 import { Plus, Search, Filter, Download, RefreshCw, Building2, Edit } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { getFriendlyErrorMessage, FriendlyError } from '@/utils/errorHandler';
+import FriendlyErrorAlert from '@/components/ui/FriendlyErrorAlert';
 import {
   Select,
   SelectContent,
@@ -29,6 +31,7 @@ const Clients = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<FriendlyError | null>(null);
   const navigate = useNavigate();
 
   const columns = [
@@ -122,6 +125,8 @@ const Clients = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
+        const friendlyError = getFriendlyErrorMessage(error);
+        setError(friendlyError);
         console.error('Error fetching companies:', error);
         return;
       }
@@ -141,6 +146,8 @@ const Clients = () => {
 
       setCompanies(transformedData);
     } catch (error) {
+      const friendlyError = getFriendlyErrorMessage(error);
+      setError(friendlyError);
       console.error('Error:', error);
     } finally {
       setLoading(false);
@@ -198,6 +205,21 @@ const Clients = () => {
             </Button>
           </div>
         </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6">
+            <FriendlyErrorAlert error={error} />
+            <Button
+              onClick={() => setError(null)}
+              variant="outline"
+              size="sm"
+              className="mt-2"
+            >
+              Clear Error
+            </Button>
+          </div>
+        )}
 
         {/* Data Table */}
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">

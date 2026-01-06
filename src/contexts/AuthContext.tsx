@@ -1,0 +1,338 @@
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { User, Session } from '@supabase/supabase-js';
+import { getFriendlyErrorMessage, FriendlyError } from '@/utils/errorHandler';
+
+export type UserRole = 'client' | 'admin' | 'agent' | null;
+
+export interface UserProfile {
+  id: string;
+  user_id: string;
+  role: UserRole;
+  company_id?: string;
+  full_name?: string;
+  phone?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuthContextType {
+  user: User | null;
+  profile: UserProfile | null;
+  session: Session | null;
+  loading: boolean;
+  role: UserRole;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: FriendlyError }>;
+  logout: () => Promise<void>;
+  signUp: (email: string, password: string, fullName?: string) => Promise<{ success: boolean; error?: FriendlyError }>;
+  resetPassword: (email: string) => Promise<{ success: boolean; error?: FriendlyError }>;
+  updateProfile: (profile: Partial<UserProfile>) => Promise<{ success: boolean; error?: FriendlyError }>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [role, setRole] = useState<UserRole>(null);
+
+  // Fetch user profile from database
+  const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        return null;
+      }
+
+      return data as UserProfile;
+    } catch (error) {
+      console.error('Unexpected error fetching user profile:', error);
+      return null;
+    }
+  };
+
+  // Initialize auth state
+  useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          setLoading(false);
+          return;
+        }
+
+        if (session?.user) {
+          setUser(session.user);
+          setSession(session);
+          
+          // Fetch user profile to get role
+          const userProfile = await fetchUserProfile(session.user.id);
+          if (userProfile) {
+            setProfile(userProfile);
+            setRole(userProfile.role);
+          }
+        }
+      } catch (error) {
+        console.error('Unexpected error initializing auth:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, session);
+        
+        setUser(session?.user || null);
+        setSession(session || null);
+        
+        if (session?.user) {
+          const userProfile = await fetchUserProfile(session.user.id);
+          if (userProfile) {
+            setProfile(userProfile);
+            setRole(userProfile.role);
+          } else {
+            setProfile(null);
+            setRole(null);
+          }
+        } else {
+          setProfile(null);
+          setRole(null);
+        }
+        
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: FriendlyError }> => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        const friendlyError = getFriendlyErrorMessage(error);
+        console.error('Login error:', error);
+        return { success: false, error: friendlyError };
+      }
+
+      if (data.user) {
+        // Fetch user profile
+        const userProfile = await fetchUserProfile(data.user.id);
+        if (userProfile) {
+          setProfile(userProfile);
+          setRole(userProfile.role);
+        }
+        
+        return { success: true };
+      }
+
+      return { success: false, error: { title: 'Login Failed', message: 'Unknown error occurred', type: 'error' } };
+    } catch (error) {
+      console.error('Unexpected login error:', error);
+      const friendlyError = getFriendlyErrorMessage(error);
+      return { success: false, error: friendlyError };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signUp = async (email: string, password: string, fullName?: string): Promise<{ success: boolean; error?: FriendlyError }> => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName || '',
+          }
+        }
+      });
+
+      if (error) {
+        const friendlyError = getFriendlyErrorMessage(error);
+        console.error('Sign up error:', error);
+        return { success: false, error: friendlyError };
+      }
+
+      if (data.user && !data.session) {
+        return { 
+          success: false, 
+          error: { 
+            title: 'Verification Required', 
+            message: 'Please check your email to verify your account.', 
+            type: 'info',
+            action: 'Check your inbox and click the verification link.'
+          } 
+        };
+      }
+
+      if (data.user) {
+        // Create user profile
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .insert({
+            user_id: data.user.id,
+            role: 'client', // Default role
+            full_name: fullName || data.user.email?.split('@')[0] || '',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+
+        if (profileError) {
+          console.error('Error creating user profile:', profileError);
+          // Still return success since auth worked, but log the error
+        }
+
+        return { success: true };
+      }
+
+      return { success: false, error: { title: 'Sign Up Failed', message: 'Unknown error occurred', type: 'error' } };
+    } catch (error) {
+      console.error('Unexpected sign up error:', error);
+      const friendlyError = getFriendlyErrorMessage(error);
+      return { success: false, error: friendlyError };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetPassword = async (email: string): Promise<{ success: boolean; error?: FriendlyError }> => {
+    try {
+      setLoading(true);
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        const friendlyError = getFriendlyErrorMessage(error);
+        console.error('Password reset error:', error);
+        return { success: false, error: friendlyError };
+      }
+
+      return { 
+        success: true, 
+        error: { 
+          title: 'Password Reset Email Sent', 
+          message: 'Check your email for password reset instructions.', 
+          type: 'info',
+          action: 'Follow the link in your email to reset your password.'
+        } 
+      };
+    } catch (error) {
+      console.error('Unexpected password reset error:', error);
+      const friendlyError = getFriendlyErrorMessage(error);
+      return { success: false, error: friendlyError };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = async (): Promise<void> => {
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Logout error:', error);
+      }
+      
+      setUser(null);
+      setSession(null);
+      setProfile(null);
+      setRole(null);
+    } catch (error) {
+      console.error('Unexpected logout error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateProfile = async (profileUpdate: Partial<UserProfile>): Promise<{ success: boolean; error?: FriendlyError }> => {
+    try {
+      if (!user) {
+        return { success: false, error: { title: 'Not Authenticated', message: 'You must be logged in to update your profile.', type: 'error' } };
+      }
+
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .update({
+          ...profileUpdate,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) {
+        const friendlyError = getFriendlyErrorMessage(error);
+        console.error('Profile update error:', error);
+        return { success: false, error: friendlyError };
+      }
+
+      if (data) {
+        setProfile({ ...profile, ...data });
+        return { success: true };
+      }
+
+      return { success: false, error: { title: 'Update Failed', message: 'Unknown error occurred', type: 'error' } };
+    } catch (error) {
+      console.error('Unexpected profile update error:', error);
+      const friendlyError = getFriendlyErrorMessage(error);
+      return { success: false, error: friendlyError };
+    }
+  };
+
+  const value: AuthContextType = {
+    user,
+    profile,
+    session,
+    loading,
+    role,
+    login,
+    logout,
+    signUp,
+    resetPassword,
+    updateProfile,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export default AuthProvider;

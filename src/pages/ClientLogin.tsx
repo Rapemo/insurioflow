@@ -1,67 +1,39 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
-import { Building2, Eye, EyeOff, LogIn } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Building2, Eye, EyeOff, LogIn, Mail } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import FriendlyErrorAlert from '@/components/ui/FriendlyErrorAlert';
 
 const ClientLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState<any>(null);
   const navigate = useNavigate();
+  const { login, loading } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        // Redirect to client dashboard
-        navigate('/client/dashboard');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Login failed. Please try again.');
-    } finally {
-      setLoading(false);
+    setLoginError(null);
+    
+    const result = await login(email, password);
+    
+    if (result.success) {
+      // Navigation will be handled by AuthContext based on user role
+      return;
+    } else {
+      setLoginError(result.error);
     }
   };
 
-  const handleSignUp = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      if (data.user && !data.session) {
-        setError('Please check your email to verify your account.');
-      } else if (data.user) {
-        navigate('/client/dashboard');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Sign up failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+  const handleSignUp = () => {
+    // Navigate to sign up page
+    navigate('/client/signup');
   };
 
   return (
@@ -87,10 +59,10 @@ const ClientLogin = () => {
           
           <form onSubmit={handleLogin}>
             <CardContent className="space-y-4">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
+              {loginError && (
+                <div className="mb-4">
+                  <FriendlyErrorAlert error={loginError} />
+                </div>
               )}
               
               <div className="space-y-2">
@@ -134,13 +106,22 @@ const ClientLogin = () => {
                   </Button>
                 </div>
               </div>
+
+              <div className="flex items-center justify-between">
+                <Link 
+                  to="/forgot-password" 
+                  className="text-sm text-primary hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
             </CardContent>
             
-            <CardFooter className="flex flex-col space-y-2">
+            <CardFooter className="flex flex-col space-y-3">
               <Button 
                 type="submit" 
                 className="w-full" 
-                disabled={loading}
+                disabled={loading || !email || !password}
               >
                 {loading ? (
                   <div className="flex items-center gap-2">
@@ -162,11 +143,12 @@ const ClientLogin = () => {
                 onClick={handleSignUp}
                 disabled={loading}
               >
+                <Mail className="h-4 w-4 mr-2" />
                 Create Account
               </Button>
               
               <div className="text-center text-sm text-gray-600">
-                <p>Don't have an account? Contact your insurance provider.</p>
+                <p>Need help? Contact your insurance provider.</p>
               </div>
             </CardFooter>
           </form>

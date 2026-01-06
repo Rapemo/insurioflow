@@ -35,6 +35,9 @@ import {
 } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { getFriendlyErrorMessage } from '@/utils/errorHandler';
+import FriendlyErrorAlert from '@/components/ui/FriendlyErrorAlert';
+import ErrorFallback from '@/components/ui/ErrorFallback';
 
 import { getBenefits, addBenefit, updateBenefit, deleteBenefit } from '@/services/benefitService';
 import { getCountries, addCountry, updateCountry, deleteCountry } from '@/services/countryService';
@@ -89,8 +92,8 @@ const Configuration = () => {
     currency: string;
     status: 'active' | 'inactive';
   }>>([]);
+  const [error, setError] = useState<FriendlyError | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -100,7 +103,8 @@ const Configuration = () => {
         const { data, error } = await getBenefits();
         
         if (error) {
-          setError(error.message);
+          const friendlyError = getFriendlyErrorMessage(error);
+          setError(friendlyError);
           return;
         }
 
@@ -108,7 +112,8 @@ const Configuration = () => {
           setBenefits(data);
         }
       } catch (err) {
-        setError('Failed to load benefits');
+        const friendlyError = getFriendlyErrorMessage(err);
+        setError(friendlyError);
         console.error('Error fetching benefits:', err);
       }
     };
@@ -118,7 +123,8 @@ const Configuration = () => {
         const { data, error } = await getCountries();
         
         if (error) {
-          console.error('Error fetching countries:', error);
+          const friendlyError = getFriendlyErrorMessage(error);
+          setError(friendlyError);
           return;
         }
 
@@ -126,6 +132,8 @@ const Configuration = () => {
           setCountries(data);
         }
       } catch (err) {
+        const friendlyError = getFriendlyErrorMessage(err);
+        setError(friendlyError);
         console.error('Error fetching countries:', err);
       }
     };
@@ -137,7 +145,20 @@ const Configuration = () => {
 
   return (
     <AppLayout title="Configuration" subtitle="Platform settings and administration">
-      <div className="animate-fade-in">
+        <div className="animate-fade-in">
+          {error && (
+            <div className="mb-6">
+              <FriendlyErrorAlert error={error} />
+              <Button
+                onClick={() => setError(null)}
+                variant="outline"
+                size="sm"
+                className="mt-2"
+              >
+                Clear Error
+              </Button>
+            </div>
+          )}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="bg-muted/50 p-1">
             <TabsTrigger value="benefits" className="data-[state=active]:bg-background">
@@ -534,7 +555,8 @@ const Configuration = () => {
                       setIsAddBenefitOpen(false);
                     }
                   } catch (err) {
-                    setError('Failed to add benefit');
+                    const friendlyError = getFriendlyErrorMessage(err);
+                    setError(friendlyError);
                     console.error('Error adding benefit:', err);
                   }
                 }}
@@ -641,7 +663,8 @@ const Configuration = () => {
                       });
                     }
                   } catch (err) {
-                    setError('Failed to add country');
+                    const friendlyError = getFriendlyErrorMessage(err);
+                    setError(friendlyError);
                     console.error('Error adding country:', err);
                   }
                 }}
