@@ -37,14 +37,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useToast } from '@/hooks/use-toast';
 
 import { getBenefits, addBenefit, updateBenefit, deleteBenefit } from '@/services/benefitService';
+import { getCountries, addCountry, updateCountry, deleteCountry } from '@/services/countryService';
 
-const countries = [
-  { code: 'KE', name: 'Kenya', currency: 'KES', status: 'active' },
-  { code: 'NG', name: 'Nigeria', currency: 'NGN', status: 'active' },
-  { code: 'TZ', name: 'Tanzania', currency: 'TZS', status: 'active' },
-  { code: 'RW', name: 'Rwanda', currency: 'RWF', status: 'active' },
-  { code: 'UG', name: 'Uganda', currency: 'UGX', status: 'inactive' },
-];
 
 const automationRules = [
   { id: 1, name: 'Renewal Reminder - 90 Days', trigger: 'Policy expiry in 90 days', action: 'Send email', status: 'active' },
@@ -88,6 +82,13 @@ const Configuration = () => {
     type: string;
     status: 'active' | 'inactive';
   }>>([]);
+  const [countries, setCountries] = useState<Array<{
+    id: string;
+    code: string;
+    name: string;
+    currency: string;
+    status: 'active' | 'inactive';
+  }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -109,12 +110,29 @@ const Configuration = () => {
       } catch (err) {
         setError('Failed to load benefits');
         console.error('Error fetching benefits:', err);
-      } finally {
-        setLoading(false);
+      }
+    };
+
+    const fetchCountries = async () => {
+      try {
+        const { data, error } = await getCountries();
+        
+        if (error) {
+          console.error('Error fetching countries:', error);
+          return;
+        }
+
+        if (data) {
+          setCountries(data);
+        }
+      } catch (err) {
+        console.error('Error fetching countries:', err);
       }
     };
 
     fetchBenefits();
+    fetchCountries();
+    setLoading(false);
   }, []);
 
   return (
@@ -599,13 +617,33 @@ const Configuration = () => {
                 Cancel
               </Button>
               <Button
-                onClick={() => {
-                  toast({
-                    title: "Success",
-                    description: "Country added successfully"
-                  });
-                  setNewCountry({ name: '', code: '', currency: '', status: 'active' });
-                  setIsAddCountryOpen(false);
+                onClick={async () => {
+                  try {
+                    const { data, error } = await addCountry({
+                      name: newCountry.name,
+                      code: newCountry.code,
+                      currency: newCountry.currency,
+                      status: newCountry.status
+                    });
+
+                    if (error) {
+                      setError(error.message);
+                      return;
+                    }
+
+                    if (data) {
+                      setCountries([...countries, data]);
+                      setNewCountry({ name: '', code: '', currency: '', status: 'active' });
+                      setIsAddCountryOpen(false);
+                      toast({
+                        title: "Success",
+                        description: "Country added successfully"
+                      });
+                    }
+                  } catch (err) {
+                    setError('Failed to add country');
+                    console.error('Error adding country:', err);
+                  }
                 }}
                 disabled={!newCountry.name.trim() || !newCountry.code.trim() || !newCountry.currency.trim()}
               >
