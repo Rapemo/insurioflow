@@ -32,10 +32,7 @@ export const claimService = {
     try {
       const { data, error } = await supabase
         .from('claims')
-        .select(`
-          *,
-          policies!inner(companies(name))
-        `)
+        .select('*')
         .order('submitted_date', { ascending: false });
 
       if (error) {
@@ -56,8 +53,8 @@ export const claimService = {
         created_at: item.created_at,
         updated_at: item.updated_at,
         resolved_date: item.resolved_date,
-        company_name: item.policies?.companies?.name,
-        employee_name: undefined
+        company_name: undefined, // Will be fetched separately if needed
+        employee_name: undefined // Will be fetched separately if needed
       }));
 
       return { data: transformedData, error: null };
@@ -71,10 +68,7 @@ export const claimService = {
     try {
       const { data, error } = await supabase
         .from('claims')
-        .select(`
-          *,
-          policies!inner(companies(name))
-        `)
+        .select('*')
         .eq('id', id)
         .single();
 
@@ -96,8 +90,8 @@ export const claimService = {
         created_at: data.created_at,
         updated_at: data.updated_at,
         resolved_date: data.resolved_date,
-        company_name: data.policies?.companies?.name,
-        employee_name: undefined
+        company_name: undefined, // Will be fetched separately if needed
+        employee_name: undefined // Will be fetched separately if needed
       };
 
       return { data: transformedData, error: null };

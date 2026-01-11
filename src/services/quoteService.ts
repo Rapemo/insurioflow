@@ -32,11 +32,7 @@ export const quoteService = {
     try {
       const { data, error } = await supabase
         .from('quotes')
-        .select(`
-          *,
-          companies(name),
-          providers(name)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -56,8 +52,8 @@ export const quoteService = {
         employee_count: item.employee_count,
         created_at: item.created_at,
         updated_at: item.updated_at,
-        company_name: item.companies?.name,
-        provider_name: item.providers?.name
+        company_name: undefined, // Will be fetched separately if needed
+        provider_name: undefined // Will be fetched separately if needed
       }));
 
       return { data: transformedData, error: null };
@@ -71,11 +67,7 @@ export const quoteService = {
     try {
       const { data, error } = await supabase
         .from('quotes')
-        .select(`
-          *,
-          companies(name, industry, country),
-          providers(name)
-        `)
+        .select('*')
         .eq('id', id)
         .single();
 
@@ -96,8 +88,8 @@ export const quoteService = {
         employee_count: data.employee_count,
         created_at: data.created_at,
         updated_at: data.updated_at,
-        company_name: data.companies?.name,
-        provider_name: data.providers?.name
+        company_name: undefined, // Will be fetched separately if needed
+        provider_name: undefined // Will be fetched separately if needed
       };
 
       return { data: transformedData, error: null };
