@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,23 +17,25 @@ import {
   Edit2, 
   Trash2, 
   UserPlus,
-  Key
+  Key,
+  User
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { userService, User, UserProfile, CreateUserData } from '@/services/userService';
+import { userService, AuthUser, UserProfile, CreateUserData } from '@/services/userService';
 
 const UserManagement = () => {
-  const [users, setUsers] = useState<(User & { profile?: UserProfile })[]>([]);
+  const [users, setUsers] = useState<(AuthUser & { profile?: UserProfile })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<User & { profile?: UserProfile } | null>(null);
+  const [editingUser, setEditingUser] = useState<AuthUser & { profile?: UserProfile } | null>(null);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'client' | 'admin' | 'agent'>('client');
   const [inviteCompanyId, setInviteCompanyId] = useState<string>('');
   const { user: currentUser, role: currentRole } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchUsers();
@@ -181,7 +184,7 @@ const UserManagement = () => {
     }
   };
 
-  const openEditDialog = (user: User & { profile?: UserProfile }) => {
+  const openEditDialog = (user: AuthUser & { profile?: UserProfile }) => {
     setEditingUser(user);
     setIsEditDialogOpen(true);
   };
@@ -238,9 +241,13 @@ const UserManagement = () => {
               </div>
             </div>
             <div className="flex items-center space-x-4">
+              <Button onClick={() => navigate('/users/create')} variant="outline">
+                <Plus className="h-4 w-4 mr-2" />
+                Create User (Simple)
+              </Button>
               <Button onClick={() => setIsCreateDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
-                Add User
+                Add Client User
               </Button>
               <Button onClick={() => fetchUsers()}>
                 <Edit2 className="h-4 w-4 mr-2" />
@@ -295,7 +302,7 @@ const UserManagement = () => {
                 </div>
                 <div>
                   <Label htmlFor="invite-role">Role</Label>
-                  <Select value={inviteRole} onValueChange={setInviteRole}>
+                  <Select value={inviteRole} onValueChange={(value: 'client' | 'admin' | 'agent') => setInviteRole(value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
@@ -309,13 +316,12 @@ const UserManagement = () => {
               </div>
               <div>
                 <Label htmlFor="invite-company">Company (Optional)</Label>
-                  <Input
-                    id="invite-company"
-                    placeholder="Company ID"
-                    value={inviteCompanyId}
-                    onChange={(e) => setInviteCompanyId(e.target.value)}
-                  />
-                </div>
+                <Input
+                  id="invite-company"
+                  placeholder="Company ID"
+                  value={inviteCompanyId}
+                  onChange={(e) => setInviteCompanyId(e.target.value)}
+                />
               </div>
               <Button onClick={handleInviteUser} disabled={!inviteEmail}>
                 <UserPlus className="h-4 w-4 mr-2" />
@@ -534,7 +540,6 @@ const UserManagement = () => {
               e.preventDefault();
               const formData = new FormData(e.currentTarget);
               handleUpdateUserRole(editingUser.id, formData.get('role') as 'client' | 'admin' | 'agent');
-              // TODO: Update other profile fields as needed
               toast({
                 title: "Success",
                 description: "User role updated successfully",
