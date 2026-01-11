@@ -1,6 +1,8 @@
 import React from 'react';
-import { Building2, Eye, EyeOff } from 'lucide-react';
-import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { Building2, Eye, EyeOff, AlertCircle, UserPlus, LogIn } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 const Index = () => {
   const [email, setEmail] = useState('');
@@ -8,22 +10,64 @@ const Index = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loginMode, setLoginMode] = useState<'auto' | 'client' | 'admin'>('auto');
   
+  const { user, loading: authLoading, role, login } = useAuth();
+  const navigate = useNavigate();
+
   console.log('Index: Component rendering successfully');
-  
+  console.log('Index: Auth state:', { user: !!user, role, authLoading });
+
+  // Handle automatic redirect when user is authenticated
+  useEffect(() => {
+    if (!authLoading && user && role) {
+      console.log('Index: User authenticated, redirecting based on role:', role);
+      if (role === 'admin') {
+        navigate('/dashboard');
+      } else if (role === 'client') {
+        navigate('/client/dashboard');
+      }
+    }
+  }, [user, authLoading, role, navigate]);
+
+  // Show loading while auth state is being determined
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   const handleQuickLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
-      console.log('Mock login attempt:', email);
-      setError('Login temporarily disabled - page loads successfully!');
+      console.log('Index: Attempting login for:', email);
+      const result = await login(email, password);
+      
+      if (result.success) {
+        console.log('Index: Login successful');
+        // Navigation will happen automatically via useEffect
+      } else {
+        console.error('Index: Login failed:', result.error);
+        setError(result.error?.message || 'Login failed. Please check your credentials.');
+      }
     } catch (error) {
-      setError('An error occurred');
+      console.error('Index: Unexpected login error:', error);
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDirectNavigation = (path: string) => {
+    navigate(path);
   };
 
   return (
@@ -43,9 +87,49 @@ const Index = () => {
           <div className="bg-white rounded-lg shadow-lg p-8">
             <h2 className="text-2xl font-semibold text-center mb-6">Login to Your Account</h2>
             
+            {/* Login Mode Selector */}
+            <div className="flex justify-center mb-6">
+              <div className="inline-flex rounded-lg bg-gray-100 p-1">
+                <button
+                  onClick={() => setLoginMode('auto')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    loginMode === 'auto' 
+                      ? 'bg-white text-gray-900 shadow-sm' 
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Smart Login
+                </button>
+                <button
+                  onClick={() => setLoginMode('client')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    loginMode === 'client' 
+                      ? 'bg-white text-gray-900 shadow-sm' 
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Client Portal
+                </button>
+                <button
+                  onClick={() => setLoginMode('admin')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    loginMode === 'admin' 
+                      ? 'bg-white text-gray-900 shadow-sm' 
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Admin Portal
+                </button>
+              </div>
+            </div>
+            
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                <p className="text-sm text-red-600">{error}</p>
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-start">
+                <AlertCircle className="h-5 w-5 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm text-red-800 font-medium">Login Failed</p>
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
               </div>
             )}
 
@@ -90,19 +174,60 @@ const Index = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
               >
-                {loading ? 'Signing in...' : 'Sign In'}
+                {loading ? 'Signing in...' : `Sign In ${loginMode === 'auto' ? '(Smart)' : loginMode === 'client' ? '(Client)' : '(Admin)'}`}
               </button>
             </form>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
-                Don't have an account?{' '}
-                <button className="text-blue-600 hover:text-blue-800 font-medium">
-                  Sign up
+            <div className="mt-6 space-y-4">
+              <div className="text-center">
+                <p className="text-sm text-gray-600">
+                  Don't have an account?{' '}
+                  <button 
+                    onClick={() => handleDirectNavigation('/client/signup')}
+                    className="text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    Sign up
+                  </button>
+                </p>
+              </div>
+
+              <div className="text-center">
+                <button 
+                  onClick={() => handleDirectNavigation('/forgot-password')}
+                  className="text-gray-600 hover:text-gray-800 text-sm"
+                >
+                  Forgot your password?
                 </button>
-              </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Direct Access Options */}
+          <div className="mt-6 bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center space-x-3 mb-4">
+              <Building2 className="h-6 w-6 text-blue-600" />
+              <h2 className="text-lg font-semibold">Direct Access</h2>
+            </div>
+            <p className="text-gray-600 mb-6">
+              Go directly to specific login portals.
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => handleDirectNavigation('/client/login')}
+                className="w-full flex items-center justify-center px-4 py-2 border border-blue-600 text-blue-600 rounded-lg font-medium hover:bg-blue-50 transition-colors"
+              >
+                <LogIn className="h-5 w-5 mr-2" />
+                Client Portal
+              </button>
+              <button
+                onClick={() => handleDirectNavigation('/admin/login')}
+                className="w-full flex items-center justify-center px-4 py-2 border border-gray-600 text-gray-600 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+              >
+                <Building2 className="h-5 w-5 mr-2" />
+                Admin Portal
+              </button>
             </div>
           </div>
         </div>
