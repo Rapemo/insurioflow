@@ -142,8 +142,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           sessionStorage.clear(); // Clear sessionStorage
           // Store new deployment version
           localStorage.setItem('deployment_version', DEPLOYMENT_VERSION);
-          setLoading(false);
-          return;
+          // Continue with normal flow after clearing
         }
         
         const { data: { session }, error } = await supabase.auth.getSession();
