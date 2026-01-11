@@ -132,23 +132,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('AuthContext: Initializing auth...');
         setLoading(true);
         
-        // TEMPORARILY DISABLED: Check deployment version and invalidate sessions if needed
-        // const storedVersion = localStorage.getItem('deployment_version');
-        // if (storedVersion !== DEPLOYMENT_VERSION) {
-        //   console.log('AuthContext: New deployment detected, clearing sessions');
-        //   // Clear all auth data for new deployment
-        //   await supabase.auth.signOut();
-        //   localStorage.clear(); // Clear all localStorage
-        //   sessionStorage.clear(); // Clear sessionStorage
-        //   // Store new deployment version
-        //   localStorage.setItem('deployment_version', DEPLOYMENT_VERSION);
-        //   console.log('AuthContext: Deployment version updated, continuing auth flow');
-        //   // Continue with normal flow after clearing
-        // } else {
-        //   console.log('AuthContext: Deployment version matches, continuing normally');
-        // }
+        // Add timeout to prevent infinite loading
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Auth initialization timeout')), 10000)
+        );
         
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const authPromise = supabase.auth.getSession();
+        
+        // Race between auth session and timeout
+        const { data: { session }, error } = await Promise.race([authPromise, timeoutPromise]) as any;
         
         if (error) {
           console.error('Error getting session:', error);
@@ -192,6 +184,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       } catch (error) {
         console.error('Unexpected error initializing auth:', error);
+        if (error.message === 'Auth initialization timeout') {
+          console.warn('Auth initialization timed out, setting loading to false');
+        }
       } finally {
         console.log('AuthContext: Setting loading to false');
         setLoading(false);
