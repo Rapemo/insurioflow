@@ -6,7 +6,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import AuthProvider, { useAuth } from "@/contexts/AuthContext";
 import Index from '@/pages/Index';
-import ConnectionTest from '@/components/ConnectionTest';
 import Clients from '@/pages/Clients';
 import ClientLogin from '@/pages/ClientLogin';
 import ClientSignup from '@/pages/ClientSignup';
@@ -125,7 +124,6 @@ const App = () => (
           <Sonner />
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Routes>
-              <Route path="/test" element={<ConnectionTest />} />
               <Route path="/" element={<Index />} />
               <Route path="/client/login" element={<ClientLogin />} />
               <Route path="/client/signup" element={<ClientSignup />} />
