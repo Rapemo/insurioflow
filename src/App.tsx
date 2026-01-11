@@ -35,7 +35,7 @@ import Configuration from "./pages/Configuration";
 import UserManagement from "./pages/UserManagement";
 import UserOverview from '@/pages/UserOverview';
 import NotFound from './pages/NotFound';
-import CreateAdminUser from '@/components/CreateAdminUser';
+import CreateAdminUser from '@/pages/CreateAdminUser';
 import DatabaseUsers from '@/components/DatabaseUsers';
 import AuthDebug from '@/components/AuthDebug';
 import QuickFixProfile from '@/pages/QuickFixProfile';
