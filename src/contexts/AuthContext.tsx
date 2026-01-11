@@ -4,6 +4,9 @@ import { getConfirmationRedirectUrl, getPasswordResetRedirectUrl } from '@/utils
 import { User, Session } from '@supabase/supabase-js';
 import { getFriendlyErrorMessage, FriendlyError } from '@/utils/errorHandler';
 
+// Deployment version - change this value with each deployment
+const DEPLOYMENT_VERSION = '2026-01-11-v5';
+
 export type UserRole = 'client' | 'admin' | 'agent' | null;
 
 export interface UserProfile {
@@ -128,6 +131,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         console.log('AuthContext: Initializing auth...');
         setLoading(true);
+        
+        // Check deployment version and invalidate sessions if needed
+        const storedVersion = localStorage.getItem('deployment_version');
+        if (storedVersion !== DEPLOYMENT_VERSION) {
+          console.log('AuthContext: New deployment detected, clearing sessions');
+          // Clear all auth data for new deployment
+          await supabase.auth.signOut();
+          localStorage.clear(); // Clear all localStorage
+          sessionStorage.clear(); // Clear sessionStorage
+          // Store new deployment version
+          localStorage.setItem('deployment_version', DEPLOYMENT_VERSION);
+          setLoading(false);
+          return;
+        }
         
         const { data: { session }, error } = await supabase.auth.getSession();
         
