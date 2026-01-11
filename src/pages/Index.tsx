@@ -30,17 +30,6 @@ const Index = () => {
     }
   }, [user, authLoading, role, navigate]);
 
-  // Safety timeout to prevent infinite loading
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (authLoading) {
-        console.warn('Index: Auth loading taking too long, forcing continue');
-      }
-    }, 15000); // 15 seconds
-
-    return () => clearTimeout(timeout);
-  }, [authLoading]);
-
   // Show loading while auth state is being determined
   if (authLoading) {
     return (

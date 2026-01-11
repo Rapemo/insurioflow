@@ -132,61 +132,69 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('AuthContext: Initializing auth...');
         setLoading(true);
         
-        // Add timeout to prevent infinite loading
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Auth initialization timeout')), 10000)
-        );
-        
-        const authPromise = supabase.auth.getSession();
-        
-        // Race between auth session and timeout
-        const { data: { session }, error } = await Promise.race([authPromise, timeoutPromise]) as any;
+        // Simplified auth initialization without timeout
+        const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('Error getting session:', error);
-          setLoading(false);
-          return;
-        }
-
-        console.log('AuthContext: Session found:', session?.user?.email);
-
-        if (session?.user) {
-          setUser(session.user);
-          setSession(session);
-          
-          // Fetch user profile to get role
-          console.log('AuthContext: Fetching user profile for:', session.user.id);
-          const userProfile = await fetchUserProfile(session.user.id);
-          console.log('AuthContext: User profile result:', userProfile);
-          
-          if (userProfile) {
-            setProfile(userProfile);
-            setRole(userProfile.role);
-            console.log('AuthContext: Profile set, role:', userProfile.role);
-          } else {
-            console.warn('AuthContext: No profile found, using fallback');
-            // Create fallback profile to prevent loading state
-            const fallbackProfile = {
-              id: session.user.id,
-              user_id: session.user.id,
-              role: 'client' as UserRole,
-              full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || '',
-              phone: '',
-              created_at: session.user.created_at || new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            };
-            setProfile(fallbackProfile);
-            setRole('client');
-            console.log('AuthContext: Fallback profile created');
-          }
+          // Continue with no session instead of failing
+          console.log('AuthContext: Continuing without session due to error');
         } else {
-          console.log('AuthContext: No session found');
+          console.log('AuthContext: Session found:', session?.user?.email);
+
+          if (session?.user) {
+            setUser(session.user);
+            setSession(session);
+            
+            // Fetch user profile to get role
+            console.log('AuthContext: Fetching user profile for:', session.user.id);
+            try {
+              const userProfile = await fetchUserProfile(session.user.id);
+              console.log('AuthContext: User profile result:', userProfile);
+              
+              if (userProfile) {
+                setProfile(userProfile);
+                setRole(userProfile.role);
+                console.log('AuthContext: Profile set, role:', userProfile.role);
+              } else {
+                console.warn('AuthContext: No profile found, using fallback');
+                // Create fallback profile to prevent loading state
+                const fallbackProfile = {
+                  id: session.user.id,
+                  user_id: session.user.id,
+                  role: 'client' as UserRole,
+                  full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || '',
+                  phone: '',
+                  created_at: session.user.created_at || new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                };
+                setProfile(fallbackProfile);
+                setRole('client');
+                console.log('AuthContext: Fallback profile created');
+              }
+            } catch (profileError) {
+              console.error('Error fetching profile, using fallback:', profileError);
+              // Create fallback profile even if profile fetch fails
+              const fallbackProfile = {
+                id: session.user.id,
+                user_id: session.user.id,
+                role: 'client' as UserRole,
+                full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || '',
+                phone: '',
+                created_at: session.user.created_at || new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              };
+              setProfile(fallbackProfile);
+              setRole('client');
+              console.log('AuthContext: Fallback profile created due to error');
+            }
+          } else {
+            console.log('AuthContext: No session found');
+          }
         }
       } catch (error) {
         console.error('Unexpected error initializing auth:', error);
-        if (error.message === 'Auth initialization timeout') {
-          console.warn('Auth initialization timed out, setting loading to false');
-        }
+        console.log('AuthContext: Continuing with no authentication due to error');
       } finally {
         console.log('AuthContext: Setting loading to false');
         setLoading(false);
