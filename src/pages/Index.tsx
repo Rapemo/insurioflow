@@ -1,8 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
 import { Building2, Eye, EyeOff, AlertCircle, LogIn } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 const Index = () => {
   const [email, setEmail] = useState('');
@@ -12,35 +11,9 @@ const Index = () => {
   const [error, setError] = useState('');
   const [loginMode, setLoginMode] = useState<'auto' | 'client' | 'admin'>('auto');
   
-  const { user, loading: authLoading, role, login } = useAuth();
   const navigate = useNavigate();
 
-  console.log('Index: Component rendering successfully');
-  console.log('Index: Auth state:', { user: !!user, role, authLoading });
-
-  // Handle automatic redirect when user is authenticated
-  useEffect(() => {
-    if (!authLoading && user && role) {
-      console.log('Index: User authenticated, redirecting based on role:', role);
-      if (role === 'admin') {
-        navigate('/dashboard');
-      } else if (role === 'client') {
-        navigate('/client/dashboard');
-      }
-    }
-  }, [user, authLoading, role, navigate]);
-
-  // Show loading while auth state is being determined
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  console.log('Index: Component rendering successfully - stable version');
 
   const handleQuickLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,18 +21,20 @@ const Index = () => {
     setError('');
 
     try {
-      console.log('Index: Attempting login for:', email);
-      const result = await login(email, password);
+      console.log('Index: Redirecting to login page for:', email);
       
-      if (result.success) {
-        console.log('Index: Login successful, redirect will happen automatically');
-        // Navigation will happen automatically via useEffect
+      // Redirect to appropriate login page based on mode
+      if (loginMode === 'client') {
+        navigate('/client/login');
+      } else if (loginMode === 'admin') {
+        navigate('/admin/login');
       } else {
-        console.error('Index: Login failed:', result.error);
-        setError(result.error?.message || 'Login failed. Please check your credentials.');
+        // Auto mode - try client login first
+        navigate('/client/login');
       }
+      
     } catch (error) {
-      console.error('Index: Unexpected login error:', error);
+      console.error('Index: Unexpected error:', error);
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
