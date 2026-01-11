@@ -1,8 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
 import { Building2, LogIn, UserPlus, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import MinimalApp from '@/components/MinimalApp';
 
 const Index = () => {
   const [email, setEmail] = useState('');
@@ -12,31 +10,19 @@ const Index = () => {
   const [error, setError] = useState('');
   const [loginMode, setLoginMode] = useState<'auto' | 'client' | 'admin'>('auto');
   
-  const { user, loading: authLoading, role, login, logout } = useAuth();
+  // Temporarily bypass auth context for testing
+  const user = null;
+  const authLoading = false;
+  const role = null;
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Only redirect after auth state is determined
-    if (!authLoading) {
-      if (!user) {
-        // Don't immediately redirect to login, show landing page
-        console.log('Index: No user found, showing landing page');
-        return;
-      } else if (role && role !== null) {
-        // Only redirect if user has a proper role (not null)
-        console.log('Index: User found with proper role:', role);
-        // Redirect to appropriate dashboard based on user role
-        if (role === 'admin') {
-          navigate('/dashboard');
-        } else {
-          navigate('/client/dashboard');
-        }
-      } else {
-        // User exists but no proper role - show landing page with login options
-        console.log('Index: User exists but no proper role, showing landing page');
-      }
+    // Simplified logic for testing
+    if (!authLoading && !user) {
+      console.log('Index: Showing landing page (test mode)');
+      return;
     }
-  }, [user, authLoading, role, navigate]);
+  }, [user, authLoading, navigate]);
 
   const handleQuickLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,16 +30,11 @@ const Index = () => {
     setError('');
 
     try {
-      const result = await login(email, password);
-      
-      if (result.success) {
-        // Navigation happens automatically via useEffect
-      } else {
-        setError(result.error?.message || 'Login failed');
-      }
+      // Mock login for testing
+      console.log('Mock login attempt:', email);
+      setError('Login temporarily disabled for testing');
     } catch (error) {
-      console.error('Auth context error:', error);
-      setError('An unexpected error occurred. Please try again.');
+      setError('An error occurred');
     } finally {
       setLoading(false);
     }
