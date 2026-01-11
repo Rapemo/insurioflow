@@ -34,50 +34,57 @@ const UserOverview = () => {
       setLoading(true);
       setError(null);
 
-      // Use raw SQL query to get users with profiles
-      const { data, error } = await supabase
-        .from('users')
-        .select(`
-          id,
-          email,
-          created_at,
-          last_sign_in_at,
-          email_confirmed_at,
-          user_profiles!inner(
-            role,
-            full_name,
-            company_id,
-            phone,
-            created_at,
-            updated_at
-          )
-        `)
-        .order('created_at', { ascending: false });
+      // Get all users from auth.users
+      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
 
-      if (error) {
-        console.error('Error fetching users:', error);
+      if (authError) {
+        console.error('Error fetching auth users:', authError);
         setError('Failed to fetch users');
         return;
       }
 
-      const transformedData = (data || []).map((user: any) => ({
-        id: user.id,
-        email: user.email,
-        created_at: user.created_at,
-        last_sign_in_at: user.last_sign_in_at,
-        email_confirmed_at: user.email_confirmed_at,
-        role: user.user_profiles?.role,
-        full_name: user.user_profiles?.full_name,
-        company_id: user.user_profiles?.company_id,
-        phone: user.user_profiles?.phone,
-        profile_created_at: user.user_profiles?.created_at,
-        profile_updated_at: user.user_profiles?.updated_at
-      }));
+      if (!authUsers || authUsers.users.length === 0) {
+        setUsers([]);
+        setLoading(false);
+        return;
+      }
+
+      // Get user profiles for all users
+      const userIds = authUsers.users.map(user => user.id);
+      const { data: profiles, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .in('user_id', userIds);
+
+      if (profileError) {
+        console.error('Error fetching user profiles:', profileError);
+        setError('Failed to fetch user profiles');
+        return;
+      }
+
+      // Combine auth users with their profiles
+      const transformedData = authUsers.users.map((authUser: any) => {
+        const profile = profiles?.find((p: any) => p.user_id === authUser.id);
+        return {
+          id: authUser.id,
+          email: authUser.email,
+          created_at: authUser.created_at,
+          last_sign_in_at: authUser.last_sign_in_at,
+          email_confirmed_at: authUser.email_confirmed_at,
+          role: profile?.role,
+          full_name: profile?.full_name || authUser.user_metadata?.full_name,
+          company_id: profile?.company_id,
+          phone: profile?.phone,
+          profile_created_at: profile?.created_at,
+          profile_updated_at: profile?.updated_at
+        };
+      });
 
       setUsers(transformedData);
+      setLoading(false);
     } catch (error) {
       console.error('Unexpected error fetching users:', error);
-      setError('Unexpected error occurred');
+      setError('Failed to load users');
     } finally {
       setLoading(false);
     }

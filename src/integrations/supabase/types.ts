@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      user_profiles: {
+        Row: {
+          id: string
+          user_id: string
+          role: 'client' | 'admin' | 'agent'
+          company_id: string | null
+          full_name: string | null
+          phone: string | null
+          avatar_url: string | null
+          preferences: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          role?: 'client' | 'admin' | 'agent'
+          company_id?: string | null
+          full_name?: string | null
+          phone?: string | null
+          avatar_url?: string | null
+          preferences?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          role?: 'client' | 'admin' | 'agent'
+          company_id?: string | null
+          full_name?: string | null
+          phone?: string | null
+          avatar_url?: string | null
+          preferences?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       claims: {
         Row: {
           amount: number

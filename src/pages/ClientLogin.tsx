@@ -14,20 +14,67 @@ const ClientLogin = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { login, loading } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
+    setIsSubmitting(true);
     
-    const result = await login(email, password);
-    
-    if (result.success) {
-      // Navigation will be handled by AuthContext based on user role
+    // Basic validation
+    if (!email || !password) {
+      setLoginError({
+        title: 'Missing Information',
+        message: 'Please enter both email and password.',
+        type: 'warning',
+        action: 'Fill in all required fields and try again.'
+      });
+      setIsSubmitting(false);
       return;
-    } else {
-      setLoginError(result.error);
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setLoginError({
+        title: 'Invalid Email',
+        message: 'Please enter a valid email address.',
+        type: 'warning',
+        action: 'Check your email format (e.g., user@example.com).'
+      });
+      setIsSubmitting(false);
+      return;
+    }
+    
+    try {
+      const result = await login(email, password);
+      
+      if (result.success) {
+        // Navigate based on user role
+        if (result.role === 'admin') {
+          navigate('/dashboard');
+        } else if (result.role === 'client') {
+          navigate('/client/dashboard');
+        } else {
+          // Default fallback for other roles
+          navigate('/client/dashboard');
+        }
+        return;
+      } else {
+        setLoginError(result.error);
+      }
+    } catch (error: any) {
+      // Handle unexpected errors
+      setLoginError({
+        title: 'Login Failed',
+        message: 'An unexpected error occurred during login.',
+        type: 'error',
+        action: 'Please try again or contact support if the problem persists.'
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -74,7 +121,8 @@ const ClientLogin = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  disabled={loading}
+                  disabled={loading || isSubmitting}
+                  autoComplete="email"
                 />
               </div>
               
@@ -88,7 +136,8 @@ const ClientLogin = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    disabled={loading}
+                    disabled={loading || isSubmitting}
+                    autoComplete="current-password"
                   />
                   <Button
                     type="button"
@@ -96,7 +145,7 @@ const ClientLogin = () => {
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
-                    disabled={loading}
+                    disabled={loading || isSubmitting}
                   >
                     {showPassword ? (
                       <EyeOff className="h-4 w-4" />
@@ -121,9 +170,9 @@ const ClientLogin = () => {
               <Button 
                 type="submit" 
                 className="w-full" 
-                disabled={loading || !email || !password}
+                disabled={loading || isSubmitting || !email || !password}
               >
-                {loading ? (
+                {loading || isSubmitting ? (
                   <div className="flex items-center gap-2">
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                     Signing in...

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ClientForm from '@/components/forms/ClientForm';
+import ClientOnboardingWizard from '@/components/forms/ClientOnboardingWizard';
 import FriendlyErrorAlert from '@/components/ui/FriendlyErrorAlert';
 import { ArrowLeft, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -55,11 +55,11 @@ const CreateClient = () => {
       }
 
       console.log('Client created successfully:', result);
-      setSuccess('Client created successfully! Redirecting to clients page...');
+      setSuccess('Client created successfully! Redirecting...');
       
-      // Redirect to clients page after successful creation
+      // Redirect to onboarding complete page after successful creation
       setTimeout(() => {
-        navigate('/clients');
+        navigate(`/clients/onboarding-complete/${result.id}`);
       }, 2000);
 
     } catch (err: any) {
@@ -109,7 +109,7 @@ const CreateClient = () => {
           </Alert>
         )}
 
-        <ClientForm
+        <ClientOnboardingWizard
           onSubmit={handleSubmit}
           onCancel={handleCancel}
           isLoading={isLoading}
