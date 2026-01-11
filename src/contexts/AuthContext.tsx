@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getConfirmationRedirectUrl, getPasswordResetRedirectUrl } from '@/utils/supabaseConfig';
 import { User, Session } from '@supabase/supabase-js';
 import { getFriendlyErrorMessage, FriendlyError } from '@/utils/errorHandler';
 
@@ -22,9 +23,9 @@ export interface AuthContextType {
   session: Session | null;
   loading: boolean;
   role: UserRole;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: FriendlyError }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: FriendlyError; role?: UserRole }>;
   logout: () => Promise<void>;
-  signUp: (email: string, password: string, fullName?: string) => Promise<{ success: boolean; error?: FriendlyError }>;
+  signUp: (email: string, password: string, fullName?: string) => Promise<{ success: boolean; error?: FriendlyError; data?: User; message?: string }>;
   resetPassword: (email: string) => Promise<{ success: boolean; error?: FriendlyError }>;
   updateProfile: (profile: Partial<UserProfile>) => Promise<{ success: boolean; error?: FriendlyError }>;
 }
@@ -53,7 +54,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Fetch user profile from database
   const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('user_profiles')
         .select('*')
         .eq('user_id', userId)
@@ -61,12 +62,62 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (error) {
         console.error('Error fetching user profile:', error);
+        
+        // Handle RLS recursion error specifically
+        if (error.code === '42P17' || error.message?.includes('infinite recursion')) {
+          console.warn('RLS recursion detected, trying admin bypass...');
+          
+          // Try using service role or admin context if available
+          try {
+            const { data: adminData, error: adminError } = await (supabase as any)
+              .rpc('get_user_profile_admin', { user_uuid: userId });
+              
+            if (!adminError && adminData) {
+              return adminData as UserProfile;
+            }
+          } catch (rpcError) {
+            console.warn('RPC fallback failed:', rpcError);
+          }
+        }
+        
+        // For any error, create fallback profile from auth metadata
+        console.warn('Creating fallback profile from auth metadata due to error:', error.message);
+        const { data: userData } = await supabase.auth.getUser(userId);
+        if (userData.user) {
+          return {
+            id: userId,
+            user_id: userId,
+            role: 'client' as UserRole,
+            full_name: userData.user.user_metadata?.full_name || userData.user.email?.split('@')[0] || '',
+            phone: userData.user.user_metadata?.phone || '',
+            created_at: userData.user.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+        }
+        
         return null;
       }
 
       return data as UserProfile;
     } catch (error) {
       console.error('Unexpected error fetching user profile:', error);
+      // Even on unexpected error, try to create fallback
+      try {
+        const { data: userData } = await supabase.auth.getUser(userId);
+        if (userData.user) {
+          return {
+            id: userId,
+            user_id: userId,
+            role: 'client' as UserRole,
+            full_name: userData.user.user_metadata?.full_name || userData.user.email?.split('@')[0] || '',
+            phone: userData.user.user_metadata?.phone || '',
+            created_at: userData.user.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+        }
+      } catch (authError) {
+        console.error('Failed to get user data for fallback:', authError);
+      }
       return null;
     }
   };
@@ -75,6 +126,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
+        console.log('AuthContext: Initializing auth...');
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -83,20 +135,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           return;
         }
 
+        console.log('AuthContext: Session found:', session?.user?.email);
+
         if (session?.user) {
           setUser(session.user);
           setSession(session);
           
           // Fetch user profile to get role
+          console.log('AuthContext: Fetching user profile for:', session.user.id);
           const userProfile = await fetchUserProfile(session.user.id);
+          console.log('AuthContext: User profile result:', userProfile);
+          
           if (userProfile) {
             setProfile(userProfile);
             setRole(userProfile.role);
+            console.log('AuthContext: Profile set, role:', userProfile.role);
+          } else {
+            console.warn('AuthContext: No profile found, using fallback');
+            // Create fallback profile to prevent loading state
+            const fallbackProfile = {
+              id: session.user.id,
+              user_id: session.user.id,
+              role: 'client' as UserRole,
+              full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || '',
+              phone: '',
+              created_at: session.user.created_at || new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+            setProfile(fallbackProfile);
+            setRole('client');
+            console.log('AuthContext: Fallback profile created');
           }
+        } else {
+          console.log('AuthContext: No session found');
         }
       } catch (error) {
         console.error('Unexpected error initializing auth:', error);
       } finally {
+        console.log('AuthContext: Setting loading to false');
         setLoading(false);
       }
     };
@@ -134,7 +210,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []);
 
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: FriendlyError }> => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: FriendlyError; role?: UserRole }> => {
     try {
       setLoading(true);
       
@@ -155,12 +231,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (userProfile) {
           setProfile(userProfile);
           setRole(userProfile.role);
+          return { success: true, role: userProfile.role };
         }
         
-        return { success: true };
+        return { success: true, role: 'client' }; // Default fallback
       }
 
-      return { success: false, error: { title: 'Login Failed', message: 'Unknown error occurred', type: 'error' } };
+      return { success: false, error: { title: 'Login Failed', message: 'Unknown error occurred', type: 'error' as const } };
     } catch (error) {
       console.error('Unexpected login error:', error);
       const friendlyError = getFriendlyErrorMessage(error);
@@ -170,37 +247,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const signUp = async (email: string, password: string, fullName?: string): Promise<{ success: boolean; error?: FriendlyError }> => {
+  const signUp = async (email: string, password: string, fullName?: string) => {
     try {
-      setLoading(true);
-      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            full_name: fullName || '',
-          }
+            full_name: fullName,
+          },
+          emailRedirectTo: getConfirmationRedirectUrl(),
         }
       });
 
       if (error) {
-        const friendlyError = getFriendlyErrorMessage(error);
-        console.error('Sign up error:', error);
-        return { success: false, error: friendlyError };
+        return { success: false, error: getFriendlyErrorMessage(error) };
       }
 
-      if (data.user && !data.session) {
-        return { 
-          success: false, 
-          error: { 
-            title: 'Verification Required', 
-            message: 'Please check your email to verify your account.', 
-            type: 'info',
-            action: 'Check your inbox and click the verification link.'
-          } 
-        };
-      }
+      return { 
+        success: true, 
+        data: data.user,
+        message: 'Account created successfully! Please check your email to confirm your account.'
+      };
 
       if (data.user) {
         // Create user profile
@@ -222,7 +290,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return { success: true };
       }
 
-      return { success: false, error: { title: 'Sign Up Failed', message: 'Unknown error occurred', type: 'error' } };
+        return { success: false, error: { title: 'Sign Up Failed', message: 'Unknown error occurred', type: 'error' as const } };
     } catch (error) {
       console.error('Unexpected sign up error:', error);
       const friendlyError = getFriendlyErrorMessage(error);
@@ -237,7 +305,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(true);
       
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: getPasswordResetRedirectUrl(),
       });
 
       if (error) {
