@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Building2, Eye, EyeOff, AlertCircle } from 'lucide-react';
@@ -10,8 +10,20 @@ const AdminLogin = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
-  const { login } = useAuth();
+  const { login, loading: authLoading, user, role } = useAuth();
   const navigate = useNavigate();
+
+  // Handle automatic redirect when user is authenticated
+  useEffect(() => {
+    if (!authLoading && user && role) {
+      console.log('AdminLogin: User authenticated, redirecting based on role:', role);
+      if (role === 'admin') {
+        navigate('/dashboard');
+      } else if (role === 'client') {
+        navigate('/client/dashboard');
+      }
+    }
+  }, [user, authLoading, role, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,15 +33,8 @@ const AdminLogin = () => {
     const result = await login(email, password);
     
     if (result.success) {
-      // Navigate based on user role
-      if (result.role === 'admin') {
-        navigate('/dashboard');
-      } else if (result.role === 'client') {
-        navigate('/client/dashboard');
-      } else {
-        // Default fallback
-        navigate('/client/dashboard');
-      }
+      console.log('AdminLogin: Login successful, redirect will happen automatically');
+      // Redirect will happen automatically via useEffect
     } else {
       setError(result.error?.message || 'Login failed');
     }

@@ -252,16 +252,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return { success: false, error: friendlyError };
       }
 
-      if (data.user) {
+      if (data.user && data.session) {
+        // Set user and session state
+        setUser(data.user);
+        setSession(data.session);
+        
         // Fetch user profile
         const userProfile = await fetchUserProfile(data.user.id);
         if (userProfile) {
           setProfile(userProfile);
           setRole(userProfile.role);
+          console.log('AuthContext: Login successful, role:', userProfile.role);
           return { success: true, role: userProfile.role };
+        } else {
+          // Create fallback profile
+          const fallbackProfile = {
+            id: data.user.id,
+            user_id: data.user.id,
+            role: 'client' as UserRole,
+            full_name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || '',
+            phone: '',
+            created_at: data.user.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          setProfile(fallbackProfile);
+          setRole('client');
+          console.log('AuthContext: Login successful with fallback role: client');
+          return { success: true, role: 'client' };
         }
-        
-        return { success: true, role: 'client' }; // Default fallback
       }
 
       return { success: false, error: { title: 'Login Failed', message: 'Unknown error occurred', type: 'error' as const } };
@@ -425,6 +443,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return { success: false, error: friendlyError };
     }
   };
+
+  // Handle automatic redirect after login
+  useEffect(() => {
+    if (user && role && !loading) {
+      console.log('AuthContext: User logged in with role:', role);
+      // This will trigger the redirect in the login pages
+    }
+  }, [user, role, loading]);
 
   const value: AuthContextType = {
     user,

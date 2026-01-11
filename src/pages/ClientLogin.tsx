@@ -1,4 +1,4 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,7 +16,19 @@ const ClientLogin = () => {
   const [loginError, setLoginError] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
-  const { login, loading } = useAuth();
+  const { login, loading, user, role } = useAuth();
+
+  // Handle automatic redirect when user is authenticated
+  useEffect(() => {
+    if (!loading && user && role) {
+      console.log('ClientLogin: User authenticated, redirecting based on role:', role);
+      if (role === 'admin') {
+        navigate('/dashboard');
+      } else if (role === 'client') {
+        navigate('/client/dashboard');
+      }
+    }
+  }, [user, loading, role, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,15 +64,8 @@ const ClientLogin = () => {
       const result = await login(email, password);
       
       if (result.success) {
-        // Navigate based on user role
-        if (result.role === 'admin') {
-          navigate('/dashboard');
-        } else if (result.role === 'client') {
-          navigate('/client/dashboard');
-        } else {
-          // Default fallback for other roles
-          navigate('/client/dashboard');
-        }
+        console.log('ClientLogin: Login successful, redirect will happen automatically');
+        // Redirect will happen automatically via useEffect
         return;
       } else {
         setLoginError(result.error);
