@@ -127,6 +127,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const initializeAuth = async () => {
       try {
         console.log('AuthContext: Initializing auth...');
+        setLoading(true);
+        
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -184,6 +186,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       async (event, session) => {
         console.log('Auth state changed:', event, session);
         
+        // Set loading to true during auth state changes
+        if (event !== 'INITIAL_SESSION') {
+          setLoading(true);
+        }
+        
         setUser(session?.user || null);
         setSession(session || null);
         
@@ -201,6 +208,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setRole(null);
         }
         
+        // Always set loading to false after processing
         setLoading(false);
       }
     );
@@ -335,16 +343,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async (): Promise<void> => {
     try {
       setLoading(true);
+      
+      // Clear all auth state first
+      setUser(null);
+      setSession(null);
+      setProfile(null);
+      setRole(null);
+      
+      // Then sign out from Supabase
       const { error } = await supabase.auth.signOut();
       
       if (error) {
         console.error('Logout error:', error);
       }
       
-      setUser(null);
-      setSession(null);
-      setProfile(null);
-      setRole(null);
+      // Clear any remaining localStorage data
+      try {
+        localStorage.removeItem('supabase.auth.token');
+        localStorage.removeItem('supabase.auth.refreshToken');
+      } catch (e) {
+        console.warn('Failed to clear localStorage:', e);
+      }
+      
     } catch (error) {
       console.error('Unexpected logout error:', error);
     } finally {
