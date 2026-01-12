@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import {
@@ -18,6 +18,7 @@ import {
   Shield,
   Menu,
   Target,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -110,53 +111,120 @@ export function Sidebar() {
 export function MobileSidebar() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef<number>(0);
+  const touchEndX = useRef<number>(0);
+
+  // Handle swipe gestures
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStartX.current || !touchEndX.current) return;
+    
+    const distance = touchStartX.current - touchEndX.current;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+    
+    if (isLeftSwipe && open) {
+      setOpen(false);
+    } else if (isRightSwipe && !open && touchStartX.current < 50) {
+      setOpen(true);
+    }
+  };
+
+  // Close sidebar when route changes
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
+
+  // Handle escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && open) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [open]);
 
   return (
     <>
+      {/* Mobile Menu Button */}
       <Button
         variant="ghost"
         size="icon"
-        className="fixed left-4 top-4 z-50 lg:hidden"
+        className="fixed left-4 top-4 z-50 lg:hidden touch-manipulation min-h-11 min-w-11"
         onClick={() => setOpen(!open)}
       >
         <Menu className="h-6 w-6" />
       </Button>
 
+      {/* Backdrop */}
       {open && (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-foreground/20 backdrop-blur-sm lg:hidden"
-            onClick={() => setOpen(false)}
-          />
-          <aside className="fixed left-0 top-0 z-50 h-screen w-64 bg-sidebar lg:hidden animate-slide-up">
-            <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary">
-                <Shield className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <span className="text-lg font-semibold text-sidebar-foreground">Parallel</span>
-            </div>
-            <nav className="flex flex-col gap-1 p-3">
-              {navigationItems.map((item) => {
-                const isActive = location.pathname === item.href;
-                return (
-                  <NavLink
-                    key={item.name}
-                    to={item.href}
-                    onClick={() => setOpen(false)}
-                    className={cn(
-                      'nav-item',
-                      isActive && 'nav-item-active'
-                    )}
-                  >
-                    <item.icon className="h-5 w-5 shrink-0" />
-                    <span>{item.name}</span>
-                  </NavLink>
-                );
-              })}
-            </nav>
-          </aside>
-        </>
+        <div
+          className="fixed inset-0 z-40 bg-foreground/20 backdrop-blur-sm lg:hidden animate-fade-in"
+          onClick={() => setOpen(false)}
+        />
       )}
+
+      {/* Mobile Sidebar */}
+      <aside
+        ref={sidebarRef}
+        className={cn(
+          "fixed left-0 top-0 z-50 h-screen w-72 bg-sidebar lg:hidden transform transition-transform duration-300 ease-in-out touch-pan-y",
+          open ? "translate-x-0" : "-translate-x-full"
+        )}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Header */}
+        <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary">
+              <Shield className="h-5 w-5 text-primary-foreground" />
+            </div>
+            <span className="text-lg font-semibold text-sidebar-foreground">Parallel</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="touch-manipulation min-h-9 min-w-9"
+            onClick={() => setOpen(false)}
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex flex-col gap-1 p-3 overflow-y-auto h-[calc(100vh-4rem)]">
+          {navigationItems.map((item) => {
+            const isActive = location.pathname === item.href;
+            return (
+              <NavLink
+                key={item.name}
+                to={item.href}
+                onClick={() => setOpen(false)}
+                className={cn(
+                  'nav-item min-h-12 touch-manipulation',
+                  isActive && 'nav-item-active'
+                )}
+              >
+                <item.icon className="h-5 w-5 shrink-0" />
+                <span className="truncate">{item.name}</span>
+              </NavLink>
+            );
+          })}
+        </nav>
+      </aside>
     </>
   );
 }

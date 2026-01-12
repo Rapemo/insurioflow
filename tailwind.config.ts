@@ -7,9 +7,21 @@ export default {
   theme: {
     container: {
       center: true,
-      padding: "2rem",
+      padding: {
+        DEFAULT: "1rem",
+        sm: "1.5rem",
+        md: "2rem",
+        lg: "2rem",
+        xl: "2rem",
+        "2xl": "2rem",
+      },
       screens: {
-        "2xl": "1400px",
+        xs: "475px",
+        sm: "640px",
+        md: "768px",
+        lg: "1024px",
+        xl: "1280px",
+        "2xl": "1536px",
       },
     },
     extend: {
@@ -108,6 +120,26 @@ export default {
         lg: "var(--shadow-lg)",
         xl: "var(--shadow-xl)",
         glow: "var(--shadow-glow)",
+      },
+      spacing: {
+        '18': '4.5rem',
+        '88': '22rem',
+        '128': '32rem',
+      },
+      maxWidth: {
+        '8xl': '88rem',
+        '9xl': '96rem',
+      },
+      minWidth: {
+        '44': '11rem',
+        '48': '12rem',
+        '52': '13rem',
+        '56': '14rem',
+      },
+      touchAction: {
+        'pan-x': 'pan-x',
+        'pan-y': 'pan-y',
+        'manipulation': 'manipulation',
       },
     },
   },

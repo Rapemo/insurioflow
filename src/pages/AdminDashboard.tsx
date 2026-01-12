@@ -137,23 +137,23 @@ const AdminDashboard = () => {
       subtitle="Welcome back, here's what's happening with your business today"
     >
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
         {statCards.map((stat, index) => (
-          <Card key={index} className="hover:shadow-lg transition-shadow">
-            <CardContent className="p-6">
+          <Card key={index} className="hover:shadow-lg transition-shadow touch-manipulation">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
-                  <p className="text-2xl font-bold text-foreground mt-1">{stat.value}</p>
-                  <p className={`text-sm font-medium mt-2 ${
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{stat.title}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-foreground mt-1 truncate">{stat.value}</p>
+                  <p className={`text-xs sm:text-sm font-medium mt-2 ${
                     stat.changeType === 'positive' ? 'text-green-600' : 
                     stat.changeType === 'negative' ? 'text-red-600' : 'text-gray-600'
                   }`}>
                     {stat.change}
                   </p>
                 </div>
-                <div className={`p-3 rounded-lg ${stat.color} bg-opacity-10`}>
-                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
+                <div className={`p-2 sm:p-3 rounded-lg ${stat.color} bg-opacity-10 ml-2 sm:ml-4 flex-shrink-0`}>
+                  <stat.icon className={`h-5 w-5 sm:h-6 sm:w-6 ${stat.color}`} />
                 </div>
               </div>
             </CardContent>
@@ -162,26 +162,26 @@ const AdminDashboard = () => {
       </div>
 
       {/* Quick Actions */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
+      <Card className="mb-6 sm:mb-8">
+        <CardHeader className="pb-4 sm:pb-6">
+          <CardTitle className="text-lg sm:text-xl">Quick Actions</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <CardContent className="pt-0">
+          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {quickActions.map((action, index) => (
               <Button
                 key={index}
                 variant="outline"
-                className="h-auto flex-col gap-3 p-4 hover:shadow-md transition-all"
+                className="h-auto flex-col gap-2 sm:gap-3 p-3 sm:p-4 hover:shadow-md transition-all touch-manipulation min-h-16"
                 onClick={() => {
                   if (action.href !== '#') {
                     window.location.href = action.href;
                   }
                 }}
               >
-                <action.icon className="h-5 w-5" />
-                <span className="text-sm font-medium">{action.title}</span>
-                <span className="text-xs text-muted-foreground">{action.description}</span>
+                <action.icon className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                <span className="text-xs sm:text-sm font-medium text-center">{action.title}</span>
+                <span className="text-xs text-muted-foreground text-center hidden sm:block">{action.description}</span>
               </Button>
             ))}
           </div>
@@ -190,18 +190,18 @@ const AdminDashboard = () => {
 
       {/* Recent Activity */}
       <Card>
-        <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
+        <CardHeader className="pb-4 sm:pb-6">
+          <CardTitle className="text-lg sm:text-xl">Recent Activity</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+        <CardContent className="pt-0">
+          <div className="space-y-3 sm:space-y-4">
             {recentActivities.map((activity) => (
-              <div key={activity.id} className="flex items-start gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                <div className={`p-2 rounded-lg ${activity.iconBg}`}>
+              <div key={activity.id} className="flex items-start gap-3 sm:gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors touch-manipulation">
+                <div className={`p-2 rounded-lg ${activity.iconBg} flex-shrink-0`}>
                   <activity.icon className={`h-4 w-4 ${activity.iconColor}`} />
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">{activity.message}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{activity.message}</p>
                   <p className="text-xs text-muted-foreground">{activity.time}</p>
                 </div>
               </div>
