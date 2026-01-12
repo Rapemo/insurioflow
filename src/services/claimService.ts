@@ -33,7 +33,7 @@ export const claimService = {
       const { data, error } = await supabase
         .from('claims')
         .select('*')
-        .order('submitted_date', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching claims:', error);

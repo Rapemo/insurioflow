@@ -66,6 +66,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (error) {
         console.error('Error fetching user profile:', error);
         
+        // If profile doesn't exist, create a default one
+        if (error.code === 'PGRST116') { // No rows returned
+          console.log('Profile not found, creating default profile...');
+          return await createDefaultProfile(userId);
+        }
+        
         // Handle RLS recursion error specifically
         if (error.code === '42P17' || error.message?.includes('infinite recursion')) {
           console.warn('RLS recursion detected, trying admin bypass...');
@@ -83,7 +89,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         }
         
-        // For any error, create fallback profile from auth metadata
+        // For any other error, create fallback profile from auth metadata
         console.warn('Creating fallback profile from auth metadata due to error:', error.message);
         const { data: userData } = await supabase.auth.getUser(userId);
         if (userData.user) {
@@ -121,6 +127,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } catch (authError) {
         console.error('Failed to get user data for fallback:', authError);
       }
+      return null;
+    }
+  };
+
+  // Create default profile for new users
+  const createDefaultProfile = async (userId: string): Promise<UserProfile | null> => {
+    try {
+      const { data: userData } = await supabase.auth.getUser(userId);
+      if (!userData.user) {
+        console.error('Cannot create profile: user not found');
+        return null;
+      }
+
+      const userProfile = {
+        id: userId,
+        user_id: userId,
+        role: userData.user.user_metadata?.role || 'client',
+        full_name: userData.user.user_metadata?.full_name || userData.user.email?.split('@')[0] || '',
+        phone: userData.user.user_metadata?.phone || '',
+        preferences: {},
+        created_at: userData.user.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      console.log('Creating default profile:', userProfile);
+
+      const { data, error } = await (supabase as any)
+        .from('user_profiles')
+        .insert(userProfile)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating default profile:', error);
+        // Return fallback profile if database insert fails
+        return userProfile;
+      }
+
+      console.log('Default profile created successfully:', data);
+      return data as UserProfile;
+    } catch (error) {
+      console.error('Unexpected error creating default profile:', error);
       return null;
     }
   };
@@ -217,13 +265,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setSession(session || null);
         
         if (session?.user) {
-          const userProfile = await fetchUserProfile(session.user.id);
-          if (userProfile) {
-            setProfile(userProfile);
-            setRole(userProfile.role);
-          } else {
-            setProfile(null);
-            setRole(null);
+          console.log('🔍 AuthContext: Fetching profile for user:', session.user.id);
+          
+          // First, create fallback profile from user metadata immediately
+          const fallbackProfile = {
+            id: session.user.id,
+            user_id: session.user.id,
+            role: session.user.user_metadata?.role || 'admin', // Default to admin for our case
+            full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || '',
+            phone: session.user.user_metadata?.phone || '',
+            preferences: {},
+            created_at: session.user.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          
+          console.log('🔍 AuthContext: Using fallback profile from metadata:', fallbackProfile);
+          setProfile(fallbackProfile);
+          setRole(fallbackProfile.role);
+          
+          // Try to fetch real profile in background (with timeout)
+          const profilePromise = fetchUserProfile(session.user.id);
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Profile fetch timeout')), 3000);
+          });
+          
+          try {
+            const userProfile = await Promise.race([profilePromise, timeoutPromise]) as UserProfile | null;
+            console.log('✅ AuthContext: Real profile fetched:', userProfile);
+            
+            if (userProfile) {
+              setProfile(userProfile);
+              setRole(userProfile.role);
+            }
+            // If no real profile, keep using fallback
+          } catch (error) {
+            console.log('⚠️ AuthContext: Profile fetch failed, keeping fallback:', error);
+            // Keep using fallback profile - already set above
           }
         } else {
           setProfile(null);

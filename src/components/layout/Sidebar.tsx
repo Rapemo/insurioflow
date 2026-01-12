@@ -17,11 +17,13 @@ import {
   ChevronRight,
   Shield,
   Menu,
+  Target,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const navigationItems = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'CRM', href: '/crm', icon: Target },
   { name: 'Clients', href: '/clients', icon: Building2 },
   { name: 'Employees', href: '/employees', icon: Users },
   { name: 'Sales Pipeline', href: '/sales', icon: BarChart3 },

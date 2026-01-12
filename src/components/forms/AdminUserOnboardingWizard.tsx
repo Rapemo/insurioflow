@@ -246,6 +246,23 @@ const AdminUserOnboardingWizard = ({
 
 // Step Components
 const BasicInfoStep = ({ data, onUpdate }: { data: AdminUserFormData; onUpdate: (data: Partial<AdminUserFormData>) => void }) => {
+  const [emailError, setEmailError] = useState<string | null>(null);
+  
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setEmailError('Please enter a valid email address');
+      return false;
+    }
+    setEmailError(null);
+    return true;
+  };
+
+  const handleEmailChange = (email: string) => {
+    validateEmail(email);
+    onUpdate({ email });
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -257,9 +274,13 @@ const BasicInfoStep = ({ data, onUpdate }: { data: AdminUserFormData; onUpdate: 
               id="email"
               type="email"
               value={data.email}
-              onChange={(e) => onUpdate({ email: e.target.value })}
+              onChange={(e) => handleEmailChange(e.target.value)}
               placeholder="admin@company.com"
+              className={emailError ? 'border-red-500' : ''}
             />
+            {emailError && (
+              <p className="text-sm text-red-500 mt-1">{emailError}</p>
+            )}
           </div>
           <div>
             <Label htmlFor="full_name">Full Name *</Label>

@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useNavigate, Link } from 'react-router-dom';
 import { Building2, Eye, EyeOff, LogIn, Mail } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,10 +16,20 @@ const ClientLogin = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
   const { login, loading, user, role } = useAuth();
 
   // Handle automatic redirect when user is authenticated
+  useEffect(() => {
+    // Load saved credentials if remember me was checked
+    const savedEmail = localStorage.getItem('rememberedEmail');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
+
   useEffect(() => {
     if (!loading && user && role) {
       console.log('ClientLogin: User authenticated, redirecting based on role:', role);
@@ -65,6 +76,14 @@ const ClientLogin = () => {
       
       if (result.success) {
         console.log('ClientLogin: Login successful, redirect will happen automatically');
+        
+        // Handle remember me functionality
+        if (rememberMe) {
+          localStorage.setItem('rememberedEmail', email);
+        } else {
+          localStorage.removeItem('rememberedEmail');
+        }
+        
         // Redirect will happen automatically via useEffect
         return;
       } else {
@@ -162,6 +181,17 @@ const ClientLogin = () => {
               </div>
 
               <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="remember"
+                    checked={rememberMe}
+                    onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                    disabled={loading || isSubmitting}
+                  />
+                  <Label htmlFor="remember" className="text-sm">
+                    Remember me
+                  </Label>
+                </div>
                 <Link 
                   to="/forgot-password" 
                   className="text-sm text-primary hover:underline"

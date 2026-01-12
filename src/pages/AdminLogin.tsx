@@ -1,19 +1,37 @@
 import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useNavigate, Link } from 'react-router-dom';
+import { Building2, Eye, EyeOff, LogIn, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Building2, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import FriendlyErrorAlert from '@/components/ui/FriendlyErrorAlert';
 
 const AdminLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [loginError, setLoginError] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   
   const { login, loading: authLoading, user, role } = useAuth();
   const navigate = useNavigate();
 
   // Handle automatic redirect when user is authenticated
+  useEffect(() => {
+    // Load saved credentials if remember me was checked
+    const savedEmail = localStorage.getItem('rememberedAdminEmail');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
+
   useEffect(() => {
     if (!authLoading && user && role) {
       console.log('AdminLogin: User authenticated, redirecting based on role:', role);
@@ -27,19 +45,56 @@ const AdminLogin = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginError(null);
+    setIsSubmitting(true);
     setLoading(true);
-    setError('');
+
+    // Basic validation
+    if (!email || !password) {
+      setLoginError({
+        title: 'Missing Information',
+        message: 'Please enter both email and password.',
+        type: 'warning',
+        action: 'Fill in all required fields and try again.'
+      });
+      setLoading(false);
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setLoginError({
+        title: 'Invalid Email',
+        message: 'Please enter a valid email address.',
+        type: 'warning',
+        action: 'Check your email format (e.g., user@example.com).'
+      });
+      setLoading(false);
+      setIsSubmitting(false);
+      return;
+    }
 
     const result = await login(email, password);
     
     if (result.success) {
       console.log('AdminLogin: Login successful, redirect will happen automatically');
+      
+      // Handle remember me functionality
+      if (rememberMe) {
+        localStorage.setItem('rememberedAdminEmail', email);
+      } else {
+        localStorage.removeItem('rememberedAdminEmail');
+      }
+      
       // Redirect will happen automatically via useEffect
     } else {
-      setError(result.error?.message || 'Login failed');
+      setLoginError(result.error);
     }
     
     setLoading(false);
+    setIsSubmitting(false);
   };
 
   return (
@@ -55,84 +110,117 @@ const AdminLogin = () => {
           <p className="text-gray-600">Access your admin dashboard</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <AlertCircle className="h-5 w-5 text-red-600" />
-                <span className="text-red-700 text-sm">{error}</span>
-              </div>
-            )}
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="admin@example.com"
-                required
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter your password"
+        <Card>
+          <CardHeader>
+            <CardTitle>Admin Login</CardTitle>
+            <CardDescription>
+              Enter your credentials to access the admin dashboard
+            </CardDescription>
+          </CardHeader>
+          
+          <form onSubmit={handleSubmit}>
+            <CardContent className="space-y-4">
+              {loginError && (
+                <div className="mb-4">
+                  <FriendlyErrorAlert error={loginError} />
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="admin@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
+                  disabled={loading || isSubmitting}
+                  autoComplete="email"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
               </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center px-4 py-2 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-              ) : null}
-              Sign In as Admin
-            </button>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={loading || isSubmitting}
+                    autoComplete="current-password"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={loading || isSubmitting}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="remember"
+                    checked={rememberMe}
+                    onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                    disabled={loading || isSubmitting}
+                  />
+                  <Label htmlFor="remember" className="text-sm">
+                    Remember me
+                  </Label>
+                </div>
+                <Link 
+                  to="/forgot-password" 
+                  className="text-sm text-primary hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+            </CardContent>
+            
+            <CardFooter className="flex flex-col space-y-3">
+              <Button 
+                type="submit" 
+                className="w-full bg-gray-900 hover:bg-gray-800" 
+                disabled={loading || isSubmitting || !email || !password}
+              >
+                {loading || isSubmitting ? (
+                  <div className="flex items-center gap-2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    Signing in...
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <LogIn className="h-4 w-4" />
+                    Sign In as Admin
+                  </div>
+                )}
+              </Button>
+              
+              <div className="text-center">
+                <Link
+                  to="/client/login"
+                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                >
+                  Are you a client? Sign in here
+                </Link>
+              </div>
+            </CardFooter>
           </form>
-
-          <div className="mt-6 text-center">
-            <Link
-              to="/client/login"
-              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-            >
-              Are you a client? Sign in here
-            </Link>
-          </div>
-
-          <div className="mt-4 text-center">
-            <Link
-              to="/forgot-password"
-              className="text-gray-600 hover:text-gray-800 text-sm"
-            >
-              Forgot your password?
-            </Link>
-          </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

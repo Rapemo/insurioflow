@@ -508,6 +508,66 @@ export type Database = {
           },
         ]
       }
+      benefits: {
+        Row: {
+          id: string
+          name: string
+          type: 'medical' | 'dental' | 'vision' | 'life' | 'disability' | 'wellness'
+          status: 'active' | 'inactive'
+          description: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          type: 'medical' | 'dental' | 'vision' | 'life' | 'disability' | 'wellness'
+          status?: 'active' | 'inactive'
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          type?: 'medical' | 'dental' | 'vision' | 'life' | 'disability' | 'wellness'
+          status?: 'active' | 'inactive'
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      countries: {
+        Row: {
+          id: string
+          code: string
+          name: string
+          currency: string
+          status: 'active' | 'inactive'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          code: string
+          name: string
+          currency: string
+          status?: 'active' | 'inactive'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          code?: string
+          name?: string
+          currency?: string
+          status?: 'active' | 'inactive'
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
