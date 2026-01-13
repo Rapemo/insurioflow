@@ -1,0 +1,61 @@
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS company_id UUID REFERENCES companies(id) ON DELETE CASCADE;
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS premium DECIMAL(12,2);
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS provider_id UUID REFERENCES providers(id) ON DELETE RESTRICT;
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS employee_count INTEGER;
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS coverage_details JSONB;
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS terms TEXT;
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS created_by UUID;
+
+ALTER TABLE deals ADD COLUMN IF NOT EXISTS company_id UUID REFERENCES companies(id) ON DELETE CASCADE;
+ALTER TABLE deals ADD COLUMN IF NOT EXISTS hubspot_deal_id VARCHAR(50);
+ALTER TABLE deals ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(255);
+ALTER TABLE deals ADD COLUMN IF NOT EXISTS owner VARCHAR(255) NOT NULL DEFAULT 'System';
+ALTER TABLE deals ADD COLUMN IF NOT EXISTS description TEXT;
+
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS company_id UUID REFERENCES companies(id) ON DELETE CASCADE;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS first_name VARCHAR(100) NOT NULL;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_name VARCHAR(100) NOT NULL;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS email VARCHAR(255) NOT NULL UNIQUE;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS role VARCHAR(100);
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS department VARCHAR(100);
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS is_primary BOOLEAN DEFAULT FALSE;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS hubspot_contact_id VARCHAR(50);
+
+ALTER TABLE activities ADD COLUMN IF NOT EXISTS entity_type VARCHAR(50) CHECK (entity_type IN ('quote', 'policy', 'claim', 'company', 'user', 'system'));
+ALTER TABLE activities ADD COLUMN IF NOT EXISTS company_id UUID REFERENCES companies(id) ON DELETE CASCADE;
+ALTER TABLE activities ADD COLUMN IF NOT EXISTS amount DECIMAL(12,2);
+
+ALTER TABLE customer_interactions ADD COLUMN IF NOT EXISTS customer_id UUID REFERENCES customers(id) ON DELETE CASCADE;
+ALTER TABLE customer_interactions ADD COLUMN IF NOT EXISTS type VARCHAR(20) CHECK (type IN ('call', 'email', 'meeting', 'note', 'task'));
+ALTER TABLE customer_interactions ADD COLUMN IF NOT EXISTS subject VARCHAR(255) NOT NULL;
+ALTER TABLE customer_interactions ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE customer_interactions ADD COLUMN IF NOT EXISTS outcome TEXT;
+ALTER TABLE customer_interactions ADD COLUMN IF NOT EXISTS next_action TEXT;
+ALTER TABLE customer_interactions ADD COLUMN IF NOT EXISTS scheduled_date TIMESTAMP WITH TIME ZONE;
+ALTER TABLE customer_interactions ADD COLUMN IF NOT EXISTS completed_date TIMESTAMP WITH TIME ZONE;
+ALTER TABLE customer_interactions ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(255);
+ALTER TABLE customer_interactions ADD COLUMN IF NOT EXISTS created_by UUID;
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name VARCHAR(100) NOT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name VARCHAR(100) NOT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'user';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS department VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS hubspot_user_id VARCHAR(50);
+
+ALTER TABLE quote_deal_link ADD COLUMN IF NOT EXISTS quote_id UUID REFERENCES quotes(id) ON DELETE CASCADE;
+ALTER TABLE quote_deal_link ADD COLUMN IF NOT EXISTS deal_id UUID REFERENCES deals(id) ON DELETE CASCADE;
+ALTER TABLE quote_deal_link ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+
+CREATE INDEX IF NOT EXISTS idx_quotes_company_id ON quotes(company_id);
+CREATE INDEX IF NOT EXISTS idx_quotes_status ON quotes(status);
+CREATE INDEX IF NOT EXISTS idx_deals_company_id ON deals(company_id);
+CREATE INDEX IF NOT EXISTS idx_deals_stage ON deals(stage);
+CREATE INDEX IF NOT EXISTS idx_customers_company_id ON customers(company_id);
+CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
+CREATE INDEX IF NOT EXISTS idx_activities_entity ON activities(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_activities_company_id ON activities(company_id);
+CREATE INDEX IF NOT EXISTS idx_customer_interactions_customer_id ON customer_interactions(customer_id);

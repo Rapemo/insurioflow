@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { DataTable } from '@/components/ui/data-table';
@@ -6,9 +6,9 @@ import { StatusBadge, getStatusType } from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { mockQuotes, formatCurrency, formatDate } from '@/data/mockData';
-import { Quote } from '@/types/insurance';
-import { Plus, Search, Filter, Download, FileText, Eye, Copy } from 'lucide-react';
+import { formatCurrency, formatDate } from '@/data/mockData';
+import { Quote } from '@/lib/api/types';
+import { Plus, Search, Filter, Download, FileText, Eye, Copy, RefreshCw, Loader2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -23,13 +23,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useQuotes, useQuote, useUpdateQuote, useDeleteQuote } from '@/hooks/useQuotes';
 import { quoteService } from '@/services/quoteService';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import FriendlyErrorAlert from '@/components/ui/FriendlyErrorAlert';
 
 const statusLabels: Record<string, string> = {
   draft: 'Draft',
   pending: 'Pending',
-  approved: 'Approved',
+  sent: 'Sent',
+  accepted: 'Accepted',
   rejected: 'Rejected',
   expired: 'Expired',
 };
@@ -47,8 +51,8 @@ const columns = [
     header: 'Company',
     render: (quote: Quote) => (
       <div>
-        <p className="font-medium text-foreground">{quote.company_name || 'N/A'}</p>
-        <p className="text-xs text-muted-foreground">{quote.employees_count} employees</p>
+        <p className="font-medium text-foreground">{quote.company_id || 'N/A'}</p>
+        <p className="text-xs text-muted-foreground">{quote.employee_count} employees</p>
       </div>
     ),
   },
@@ -57,13 +61,16 @@ const columns = [
     header: 'Product',
     render: (quote: Quote) => (
       <span className="inline-flex items-center px-2 py-1 rounded-md bg-secondary text-xs font-medium">
-        {quote.productType}
+        {quote.product_type}
       </span>
     ),
   },
   {
     key: 'provider',
     header: 'Provider',
+    render: (quote: Quote) => (
+      <span>{quote.provider_id || 'N/A'}</span>
+    ),
   },
   {
     key: 'premium',
@@ -117,80 +124,39 @@ const Quotations = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isViewQuoteOpen, setIsViewQuoteOpen] = useState(false);
-  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
-  const [quotes, setQuotes] = useState<Quote[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    fetchQuotes();
-  }, []);
+  // Use React Query hooks for data management
+  const { 
+    data: quotesResponse, 
+    isLoading: loading, 
+    error,
+    refetch 
+  } = useQuotes();
 
-  const fetchQuotes = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await quoteService.getQuotes();
-      
-      if (error) {
-        setError(error.message);
-        toast({
-          title: "Error",
-          description: "Failed to fetch quotes",
-          variant: "destructive"
-        });
-        return;
-      }
+  const quotes = quotesResponse?.data || [];
 
-      if (data) {
-        setQuotes(data);
-      }
-    } catch (err) {
-      setError('Failed to load quotes');
-      toast({
-        title: "Error",
-        description: "Failed to load quotes",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: selectedQuote } = useQuote(selectedQuoteId || '');
+  
+  const updateQuoteMutation = useUpdateQuote();
+  const deleteQuoteMutation = useDeleteQuote();
 
   const filteredQuotes = quotes.filter((quote) => {
     const matchesSearch = 
-      (quote.company_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      quote.id.toLowerCase().includes(searchQuery.toLowerCase());
+      quote.quote_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      quote.product_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      quote.company_id.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || quote.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
   const totalPremium = filteredQuotes.reduce((sum, quote) => sum + quote.premium, 0);
 
-  const handleViewQuote = async (quoteId: string) => {
-    try {
-      const { data, error } = await quoteService.getQuoteById(quoteId);
-      
-      if (error) {
-        toast({
-          title: "Error",
-          description: "Failed to fetch quote details",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      if (data) {
-        setSelectedQuote(data);
-        setIsViewQuoteOpen(true);
-      }
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch quote details",
-        variant: "destructive"
-      });
-    }
+  const handleViewQuote = (quoteId: string) => {
+    setSelectedQuoteId(quoteId);
+    setIsViewQuoteOpen(true);
   };
 
   const handleCopyQuote = async (quoteId: string) => {
@@ -207,7 +173,8 @@ const Quotations = () => {
       }
 
       if (data) {
-        setQuotes([data, ...quotes]);
+        // Invalidate queries to refresh the list
+        queryClient.invalidateQueries({ queryKey: ['quotes'] });
         toast({
           title: "Success",
           description: `Quote copied successfully. New quote ID: ${data.quote_number}`
@@ -222,9 +189,35 @@ const Quotations = () => {
     }
   };
 
+  const handleStatusChange = async (quoteId: string, newStatus: Quote['status']) => {
+    updateQuoteMutation.mutate(
+      { id: quoteId, data: { status: newStatus } },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Success",
+            description: `Quote status updated to ${newStatus}`
+          });
+        },
+        onError: (error) => {
+          toast({
+            title: "Error",
+            description: "Failed to update quote status",
+            variant: "destructive"
+          });
+        }
+      }
+    );
+  };
+
   return (
     <AppLayout title="Quotations" subtitle="Create and manage insurance quotes">
       <div className="space-y-6 animate-fade-in">
+        {/* Error Display */}
+        {error && (
+          <FriendlyErrorAlert error={error as any} />
+        )}
+
         {/* Summary Cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="stat-card">
@@ -233,8 +226,17 @@ const Quotations = () => {
                 <FileText className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{quotes.length}</p>
-                <p className="text-sm text-muted-foreground">Total Quotes</p>
+                {loading ? (
+                  <div className="flex items-center">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-muted-foreground">Loading...</span>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold text-foreground">{quotes.length}</p>
+                    <p className="text-sm text-muted-foreground">Total Quotes</p>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -244,10 +246,19 @@ const Quotations = () => {
                 <FileText className="h-6 w-6 text-success" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">
-                  {quotes.filter((q) => q.status === 'approved').length}
-                </p>
-                <p className="text-sm text-muted-foreground">Approved</p>
+                {loading ? (
+                  <div className="flex items-center">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-muted-foreground">Loading...</span>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold text-foreground">
+                      {quotes.filter((q) => q.status === 'accepted').length}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Approved</p>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -257,17 +268,35 @@ const Quotations = () => {
                 <FileText className="h-6 w-6 text-warning" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">
-                  {quotes.filter((q) => q.status === 'pending').length}
-                </p>
-                <p className="text-sm text-muted-foreground">Pending</p>
+                {loading ? (
+                  <div className="flex items-center">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-muted-foreground">Loading...</span>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold text-foreground">
+                      {quotes.filter((q) => q.status === 'pending').length}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Pending</p>
+                  </>
+                )}
               </div>
             </div>
           </div>
           <div className="stat-card">
             <div>
-              <p className="text-2xl font-bold text-foreground">{formatCurrency(totalPremium)}</p>
-              <p className="text-sm text-muted-foreground">Total Premium Value</p>
+              {loading ? (
+                <div className="flex items-center">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-muted-foreground">Loading...</span>
+                </div>
+              ) : (
+                <>
+                  <p className="text-2xl font-bold text-foreground">{formatCurrency(totalPremium)}</p>
+                  <p className="text-sm text-muted-foreground">Total Premium Value</p>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -302,6 +331,15 @@ const Quotations = () => {
             </Button>
           </div>
           <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => refetch()}
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
             <Button variant="outline" size="sm">
               <Download className="h-4 w-4 mr-2" />
               Export
@@ -338,56 +376,101 @@ const Quotations = () => {
                 View quote information and manage actions
               </DialogDescription>
             </DialogHeader>
-            {selectedQuote && (
+            {selectedQuote?.data && (
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Quote Number</Label>
-                    <p className="font-mono text-sm">{selectedQuote.quote_number}</p>
+                    <p className="font-mono text-sm">{selectedQuote.data.quote_number}</p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Status</Label>
-                    <StatusBadge status={getStatusType(selectedQuote.status)} label={statusLabels[selectedQuote.status]} />
+                    <StatusBadge status={getStatusType(selectedQuote.data.status)} label={statusLabels[selectedQuote.data.status]} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Company</Label>
-                    <p className="font-medium">{selectedQuote.company_name || 'N/A'}</p>
+                    <p className="font-medium">{selectedQuote.data.company_name || 'N/A'}</p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Provider</Label>
-                    <p className="font-medium">{selectedQuote.provider}</p>
+                    <p className="font-medium">{selectedQuote.data.provider}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Product Type</Label>
-                    <p className="font-medium">{selectedQuote.product_type}</p>
+                    <p className="font-medium">{selectedQuote.data.product_type}</p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Employees Covered</Label>
-                    <p className="font-medium">{selectedQuote.employees_count}</p>
+                    <p className="font-medium">{selectedQuote.data.employee_count}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Premium</Label>
-                    <p className="font-semibold text-lg">{formatCurrency(selectedQuote.premium)}</p>
+                    <p className="font-semibold text-lg">{formatCurrency(selectedQuote.data.premium)}</p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Valid Until</Label>
-                    <p className="font-medium">{formatDate(selectedQuote.valid_until)}</p>
+                    <p className="font-medium">{formatDate(selectedQuote.data.valid_until)}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Created Date</Label>
-                    <p className="font-medium">{formatDate(selectedQuote.created_date)}</p>
+                    <p className="font-medium">{formatDate(selectedQuote.data.created_at)}</p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">Last Updated</Label>
-                    <p className="font-medium">{formatDate(selectedQuote.updated_date)}</p>
+                    <p className="font-medium">{formatDate(selectedQuote.data.updated_at)}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Change Status</Label>
+                    <Select
+                      value={selectedQuote.data.status}
+                      onValueChange={(value) => handleStatusChange(selectedQuote.data.id, value as Quote['status'])}
+                      disabled={updateQuoteMutation.isPending}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="draft">Draft</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="accepted">Accepted</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                        <SelectItem value="expired">Expired</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Quick Actions</Label>
+                    <div className="flex gap-2 mt-2">
+                      {selectedQuote.data.status === 'pending' && (
+                        <Button 
+                          size="sm" 
+                          onClick={() => handleStatusChange(selectedQuote.data.id, 'accepted')}
+                          disabled={updateQuoteMutation.isPending}
+                        >
+                          Accept
+                        </Button>
+                      )}
+                      {selectedQuote.data.status === 'accepted' && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleStatusChange(selectedQuote.data.id, 'rejected')}
+                          disabled={updateQuoteMutation.isPending}
+                        >
+                          Reject
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
