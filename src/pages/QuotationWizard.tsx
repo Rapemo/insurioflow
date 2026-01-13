@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { mockCompanies, mockProviders, formatCurrency } from '@/data/mockData';
-import { cn } from '@/lib/utils';
+import { useCompanies, useProviders } from '@/hooks';
+import { formatCurrency } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -54,8 +54,12 @@ const QuotationWizard = () => {
     coverageLevel: 'standard',
   });
 
-  const selectedCompany = mockCompanies.find((c) => c.id === formData.companyId);
-  const insurers = mockProviders.filter((p) => p.type === 'insurer' && p.status === 'active');
+  // Use real data from database
+  const { data: companies, isLoading: companiesLoading, error: companiesError } = useCompanies();
+  const { data: providers, isLoading: providersLoading, error: providersError } = useProviders();
+
+  const selectedCompany = companies?.find((c) => c.id === formData.companyId);
+  const insurers = providers?.filter((p) => p.type === 'insurer' && p.status === 'active') || [];
 
   const calculatePremium = () => {
     const count = formData.employeeCount || selectedCompany?.employeeCount || 0;
@@ -102,24 +106,31 @@ const QuotationWizard = () => {
                 <Select
                   value={formData.companyId}
                   onValueChange={(value) => setFormData((prev) => ({ ...prev, companyId: value }))}
+                  disabled={companiesLoading}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a company" />
+                    <SelectValue placeholder={companiesLoading ? "Loading companies..." : "Select a company"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockCompanies.map((company) => (
+                    {companies?.map((company) => (
                       <SelectItem key={company.id} value={company.id}>
                         <div className="flex items-center gap-2">
                           <span>{company.name}</span>
                           <span className="text-muted-foreground">
-                            ({company.employeeCount} employees)
+                            ({company.employee_count || company.employeeCount || 0} employees)
                           </span>
                         </div>
                       </SelectItem>
-                    ))}
+                    )) || []}
                   </SelectContent>
                 </Select>
               </div>
+              {companiesError && (
+                <div className="p-4 rounded-lg bg-destructive/10 border border-destructive">
+                  <h4 className="font-medium text-destructive-foreground mb-2">Error Loading Companies</h4>
+                  <p className="text-sm text-destructive-foreground">{companiesError}</p>
+                </div>
+              )}
 
               {selectedCompany && (
                 <div className="p-4 rounded-lg bg-secondary/50 border border-border">
@@ -127,15 +138,15 @@ const QuotationWizard = () => {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <p className="text-muted-foreground">Industry</p>
-                      <p className="font-medium">{selectedCompany.industry}</p>
+                      <p className="font-medium">{selectedCompany?.industry || 'N/A'}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Country</p>
-                      <p className="font-medium">{selectedCompany.country}</p>
+                      <p className="font-medium">{selectedCompany?.country || 'N/A'}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Employees</p>
-                      <p className="font-medium">{selectedCompany.employeeCount}</p>
+                      <p className="font-medium">{selectedCompany?.employee_count || selectedCompany?.employeeCount || 0}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">WorkPay ID</p>
